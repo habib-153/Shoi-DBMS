@@ -5,16 +5,20 @@ import Link from "next/link";
 import { Button } from "./ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
 import { Menu, Heart, Shield, Users, Phone } from "lucide-react";
+import { useLanguage } from "@/lib/language-context";
+import { LanguageSwitcher } from "./LanguageSwitcher";
+import { SiteBranding } from "./SiteBranding";
 
-const Navigation = () => {
+function Navigation() {
   const [isOpen, setIsOpen] = useState(false);
+  const { t } = useLanguage();
 
   const navItems = [
-    { href: "/", label: "হোম", icon: null },
-    { href: "/services", label: "সেবাসমূহ", icon: Heart },
-    { href: "/therapists", label: "বিশেষজ্ঞগণ", icon: Users },
-    { href: "/privacy", label: "গোপনীয়তা", icon: Shield },
-    { href: "/contact", label: "যোগাযোগ", icon: Phone },
+    { href: "/", label: t('nav.home'), icon: null },
+    { href: "/services", label: t('nav.services'), icon: Heart },
+    { href: "/therapists", label: t('nav.therapists'), icon: Users },
+    { href: "/privacy", label: t('nav.privacy'), icon: Shield },
+    { href: "/contact", label: t('nav.contact'), icon: Phone },
   ];
 
   return (
@@ -23,15 +27,10 @@ const Navigation = () => {
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary-dark rounded-lg flex items-center justify-center">
               <Heart className="w-6 h-6 text-white" />
             </div>
-            <div className="flex flex-col">
-              <span className="text-xl font-bold text-gray-900">মনোবন্ধন</span>
-              <span className="text-xs text-gray-500">
-                মানসিক স্বাস্থ্য সেবা
-              </span>
-            </div>
+            <SiteBranding />
           </Link>
 
           {/* Desktop Navigation */}
@@ -40,7 +39,7 @@ const Navigation = () => {
               <Link
                 key={item.href}
                 href={item.href}
-                className="text-gray-700 hover:text-purple-600 px-3 py-2 text-sm font-medium transition-colors duration-200 flex items-center space-x-1"
+                className="text-muted-foreground hover:text-primary px-3 py-2 text-sm font-medium transition-colors duration-200 flex items-center space-x-1"
               >
                 {item.icon && <item.icon className="w-4 h-4" />}
                 <span>{item.label}</span>
@@ -60,9 +59,10 @@ const Navigation = () => {
                   </Link>
 <Link href="/register">
             <Button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700">
-              নিবন্ধন
+              {t('nav.register')}
             </Button>
             </Link>
+            <LanguageSwitcher />
           </div>
 
           {/* Mobile menu button */}
@@ -92,12 +92,12 @@ const Navigation = () => {
                     variant="outline"
                     className="w-full text-purple-600 border-purple-600"
                   >
-                    প্রবেশ
+                    {t('nav.login')}
                   </Button>
                   </Link>
 <Link href="/register">
                   <Button className="w-full bg-gradient-to-r from-purple-600 to-blue-600">
-                    নিবন্ধন
+                    {t('nav.register')}
                   </Button>
                   </Link>
                 </div>

@@ -4,29 +4,54 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { useLanguage } from "@/lib/language-context";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [form, setForm] = useState({
     name: "",
     email: "",
     password: "",
+    phone: "",
+    date_of_birth: "",
+    gender: "", // default value
   });
   const [loading, setLoading] = useState(false);
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     setForm({ ...form, [e.target.name]: e.target.value });
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setLoading(false);
-      toast.success("রেজিস্ট্রেশন সফল! লগইন পেজে নিয়ে যাওয়া হচ্ছে...");
+    
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(form),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.error || t('register.error'));
+        return;
+      }
+
+      toast.success(t('register.success'));
       setTimeout(() => router.push("/login"), 1500);
-    }, 1200);
+    } catch (error) {
+      toast.error(t('register.tryAgain'));
+      console.error('Registration error:', error);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -51,10 +76,10 @@ export default function RegisterPage() {
             onSubmit={handleSubmit}
             className="w-full max-w-md space-y-6"
           >
-            <h2 className="text-3xl font-bold text-gray-900 mb-6 text-center">নিবন্ধন করুন</h2>
+            <h2 className="text-3xl font-bold text-gray-900 mb-6 text-center">{t('register.title')}</h2>
             <Input
               name="name"
-              placeholder="নাম"
+              placeholder={t('register.name')}
               value={form.name}
               onChange={handleChange}
               required
@@ -62,7 +87,7 @@ export default function RegisterPage() {
             <Input
               name="email"
               type="email"
-              placeholder="ইমেইল"
+              placeholder={t('register.email')}
               value={form.email}
               onChange={handleChange}
               required
@@ -70,21 +95,48 @@ export default function RegisterPage() {
             <Input
               name="password"
               type="password"
-              placeholder="পাসওয়ার্ড"
+              placeholder={t('register.password')}
               value={form.password}
               onChange={handleChange}
               required
             />
+            <Input
+              name="phone"
+              placeholder={t('register.phone')}
+              value={form.phone}
+              onChange={handleChange}
+              required
+            />
+            <Input
+              name="date_of_birth"
+              type="date"
+              placeholder={t('register.dob')}
+              value={form.date_of_birth}
+              onChange={handleChange}
+              required
+            />
+            <select
+              name="gender"
+              value={form.gender}
+              onChange={handleChange}
+              className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              required
+            >
+              <option value="male">{t('register.male')}</option>
+              <option value="female">{t('register.female')}</option>
+              <option value="other">{t('register.other')}</option>
+            </select>
+
             <Button
               type="submit"
               className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-lg px-6 py-3 mt-2"
               disabled={loading}
             >
-              {loading ? "নিবন্ধন হচ্ছে..." : "নিবন্ধন করুন"}
+              {loading ? t('register.loading') : t('register.button')}
             </Button>
             <p className="text-center text-sm text-gray-600">
-              ইতিমধ্যে একাউন্ট আছে?{' '}
-              <a href="/login" className="text-purple-600 hover:underline font-semibold">লগইন করুন</a>
+              {t('register.haveAccount')}{' '}
+              <a href="/login" className="text-purple-600 hover:underline font-semibold">{t('register.login')}</a>
             </p>
           </form>
         </div>

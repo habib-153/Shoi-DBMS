@@ -26,11 +26,11 @@ const Banner = () => {
   ];
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 overflow-hidden">
+    <div className="relative min-h-screen bg-gradient-to-br from-primary/5 via-primary/10 to-primary/15 overflow-hidden">
       {/* Background Pattern */}
       <div className="absolute inset-0 bg-grid-pattern opacity-5"></div>
-      <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-purple-300/30 to-blue-300/30 rounded-full blur-3xl"></div>
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-indigo-300/30 to-purple-300/30 rounded-full blur-3xl"></div>
+      <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-primary/20 to-primary-dark/20 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-primary-light/20 to-primary/20 rounded-full blur-3xl"></div>
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-20">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
@@ -42,7 +42,7 @@ const Banner = () => {
                 {[...Array(5)].map((_, i) => (
                   <Star
                     key={i}
-                    className="w-4 h-4 fill-yellow-400 text-yellow-400"
+                    className="w-4 h-4 fill-primary text-primary"
                   />
                 ))}
               </div>
