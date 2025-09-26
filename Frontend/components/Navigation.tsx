@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Menu, Calendar, LogIn, ChevronRight } from "lucide-react";
+import { Menu, LogIn } from "lucide-react";
 
 export default function Navigation() {
   const [open, setOpen] = useState(false);
@@ -56,7 +56,7 @@ export default function Navigation() {
           </div>
 
           {/* mobile burger */}
-          <button className="md:hidden p-2 rounded-lg hover:bg-gray-100" onClick={() => setOpen(!open)}>
+          <button aria-label="menu" className="md:hidden p-2 rounded-lg hover:bg-gray-100" onClick={() => setOpen(!open)}>
             <Menu className="w-6 h-6" />
           </button>
 
