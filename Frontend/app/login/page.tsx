@@ -1,100 +1,114 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Users, Shield, ArrowRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { Mail, Lock, Eye, EyeOff, Facebook, Instagram, LogIn } from "lucide-react";
 
-export default function Login() {
+export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("user"); // default role
+  const [showPw, setShowPw] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email || !password) return alert("Enter E-mail and Password.");
+    setLoading(true);
 
-    if (!email || !password) {
-      alert("সব ফিল্ড পূরণ করুন!");
-      return;
-    }
-
-    // Dummy login logic for demo
-    if (role === "user") {
+    // TODO: replace with real auth
+    setTimeout(() => {
+      setLoading(false);
       router.push("/user/dashboard");
-    } else if (role === "specialist") {
-      router.push("/specialist/dashboard");
-    }
+    }, 600);
   };
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 flex items-center justify-center">
-      {/* Background Patterns */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-purple-300/30 to-blue-300/30 rounded-full blur-3xl"></div>
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-indigo-300/30 to-purple-300/30 rounded-full blur-3xl"></div>
+    <div className="relative min-h-screen bg-gradient-to-br from-[#2596be]/10 via-sky-50 to-indigo-50 flex items-center justify-center px-4">
+      <Card className="w-full max-w-md p-8 bg-white/90 backdrop-blur-sm border-0 shadow-xl">
+        <h1 className="text-3xl font-extrabold text-center mb-1">সই</h1>
+        <p className="text-center text-gray-500 mb-6">Login To Your Account</p>
 
-      <Card className="relative w-full max-w-md p-8 bg-white/80 backdrop-blur-sm shadow-xl border-0">
-        <h2 className="text-3xl font-bold text-gray-900 mb-6 text-center">
-          মানসিক স্বাস্থ্য লগইন
-        </h2>
+        <form onSubmit={onSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm mb-1">E-mail</label>
+            <div className="relative">
+              <Mail className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+              <input
+                type="email"
+                className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#2596be]"
+                placeholder="name@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+          </div>
 
-        <form className="flex flex-col gap-4" onSubmit={handleLogin}>
-          <input
-            type="email"
-            placeholder="ইমেইল"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
-            required
-          />
-          <input
-            type="password"
-            placeholder="পাসওয়ার্ড"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
-            required
-          />
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            className="p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
-          >
-            <option value="user">ব্যবহারকারী</option>
-            <option value="specialist">বিশেষজ্ঞ</option>
-          </select>
+          <div>
+            <label className="block text-sm mb-1">Password</label>
+            <div className="relative">
+              <Lock className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+              <input
+                type={showPw ? "text" : "password"}
+                className="w-full pl-9 pr-10 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#2596be]"
+                placeholder="Your Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPw((s) => !s)}
+                className="absolute right-3 top-2.5 text-gray-500 hover:text-gray-700"
+                aria-label="Toggle password"
+              >
+                {showPw ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
+            <div className="text-right mt-1">
+              <Link href="/forgot-password" className="text-sm text-[#2596be] hover:underline">
+                Forgot password?
+              </Link>
+            </div>
+          </div>
 
           <Button
             type="submit"
-            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-lg px-6 py-3 flex items-center justify-center gap-2 mt-4"
+            disabled={loading}
+            className="w-full bg-[#2596be] hover:bg-[#1d7a99] text-white py-2.5 rounded-lg flex items-center justify-center gap-2"
           >
-            লগইন করুন
-            <ArrowRight className="w-5 h-5" />
+            <LogIn className="w-4 h-4" />
+            {loading ? "Logging in..." : "Login"}
           </Button>
         </form>
 
-        <div className="mt-6 text-center text-gray-600">
-          নতুন ব্যবহারকারী?{" "}
-          <span
-            className="text-purple-600 font-semibold cursor-pointer hover:underline"
-            onClick={() => router.push("/register")}
-          >
-            রেজিস্টার করুন
-          </span>
+        {/* OR divider */}
+        <div className="flex items-center gap-3 my-6">
+          <div className="h-px bg-gray-200 flex-1" />
+          <span className="text-xs text-gray-400">Or</span>
+          <div className="h-px bg-gray-200 flex-1" />
         </div>
 
-        {/* Optional: Features */}
-        <div className="mt-8 grid grid-cols-2 gap-4">
-          <div className="flex items-center gap-2">
-            <Users className="w-5 h-5 text-purple-600" />
-            <span className="text-sm text-gray-700">গোপনীয় & নিরাপদ</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Shield className="w-5 h-5 text-purple-600" />
-            <span className="text-sm text-gray-700">পেশাদার পরামর্শ</span>
-          </div>
+        {/* Social logins (visual) */}
+        <div className="grid grid-cols-2 gap-3">
+          <Button variant="outline" className="w-full border-[#2596be] text-[#2596be]">
+            <Facebook className="w-4 h-4 mr-2" /> Facebook
+          </Button>
+          <Button variant="outline" className="w-full border-[#2596be] text-[#2596be]">
+            <Instagram className="w-4 h-4 mr-2" /> Instagram
+          </Button>
         </div>
+
+        <p className="text-center text-sm text-gray-600 mt-6">
+          New User?{" "}
+          <Link href="/register" className="text-[#2596be] font-semibold hover:underline">
+            Register
+          </Link>
+        </p>
       </Card>
     </div>
   );
