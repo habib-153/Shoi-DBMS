@@ -59,7 +59,6 @@ export default function Navigation() {
           <button className="md:hidden p-2 rounded-lg hover:bg-gray-100" onClick={() => setOpen(!open)}>
             <Menu className="w-6 h-6" />
           </button>
-
         </div>
       </nav>
     </header>
