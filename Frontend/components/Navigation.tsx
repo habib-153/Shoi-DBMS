@@ -50,15 +50,19 @@ const Navigation = () => {
 
           {/* CTA Buttons */}
           <div className="hidden md:flex items-center space-x-3">
-            <Button
-              variant="outline"
-              className="text-purple-600 border-purple-600 hover:bg-purple-50"
-            >
-              প্রবেশ
-            </Button>
+                        <Link href="/login">
+                                    <Button
+                    variant="outline"
+                    className="w-full text-purple-600 border-purple-600"
+                  >
+                    প্রবেশ
+                  </Button>
+                  </Link>
+<Link href="/register">
             <Button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700">
               নিবন্ধন
             </Button>
+            </Link>
           </div>
 
           {/* Mobile menu button */}
@@ -83,15 +87,19 @@ const Navigation = () => {
                   </Link>
                 ))}
                 <div className="border-t pt-4 mt-6 space-y-3">
-                  <Button
+                  <Link href="/login">
+                                    <Button
                     variant="outline"
                     className="w-full text-purple-600 border-purple-600"
                   >
                     প্রবেশ
                   </Button>
+                  </Link>
+<Link href="/register">
                   <Button className="w-full bg-gradient-to-r from-purple-600 to-blue-600">
                     নিবন্ধন
                   </Button>
+                  </Link>
                 </div>
               </div>
             </SheetContent>
