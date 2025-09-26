@@ -5,6 +5,7 @@ import { Calendar, Phone, ArrowRight } from "lucide-react";
 
 export default function Banner() {
   return (
+
     <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 grid items-center gap-10 lg:grid-cols-2">
       <div>
         <h1 className="text-5xl md:text-6xl font-['Pacifico'] tracking-tight text-gray-900">সই</h1>

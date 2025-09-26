@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-import { Toaster } from "@/components/ui/sonner";
+import { LanguageProvider } from "@/lib/language-context";
+import { Providers } from "./providers";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "মনোবন্ধন - মানসিক স্বাস্থ্য সেবা",
+  title: "সই - মানসিক স্বাস্থ্য সেবা | Mental Health Care",
   description:
     "বাংলাদেশের প্রথম সম্পূর্ণ বাংলা ভাষাভিত্তিক মানসিক স্বাস্থ্য প্ল্যাটফর্ম। অভিজ্ঞ বিশেষজ্ঞদের কাছ থেকে গোপনীয় ও পেশাদার পরামর্শ নিন।",
 };
@@ -28,10 +29,13 @@ export default function RootLayout({
   return (
     <html suppressHydrationWarning lang="bn">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}
       >
-  <Toaster />
-  {children}
+        <LanguageProvider>
+          <Providers>
+            {children}
+          </Providers>
+        </LanguageProvider>
       </body>
     </html>
   );
