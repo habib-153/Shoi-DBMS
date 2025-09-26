@@ -3,83 +3,110 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { useLanguage } from "@/lib/language-context";
-import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+
+import { User, Stethoscope, ArrowRight } from "lucide-react";
 
 export default function RegisterPage() {
   const router = useRouter();
   const { t } = useLanguage();
+
+  // rishi branch functionality → single form object
   const [form, setForm] = useState({
     name: "",
     email: "",
     password: "",
     phone: "",
     date_of_birth: "",
-    gender: "", // default value
+    gender: "",
   });
   const [loading, setLoading] = useState(false);
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+  function handleChange(
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) {
     setForm({ ...form, [e.target.name]: e.target.value });
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    
+
     try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
 
       const data = await response.json();
-
       if (!response.ok) {
-        toast.error(data.error || t('register.error'));
+        toast.error(data.error || t("register.error"));
         return;
       }
 
-      toast.success(t('register.success'));
+      toast.success(t("register.success"));
       setTimeout(() => router.push("/login"), 1500);
     } catch (error) {
-      toast.error(t('register.tryAgain'));
-      console.error('Registration error:', error);
+      toast.error(t("register.tryAgain"));
+      console.error("Registration error:", error);
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 flex items-center justify-center">
-      {/* Background Patterns */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-purple-300/30 to-blue-300/30 rounded-full blur-3xl"></div>
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-indigo-300/30 to-purple-300/30 rounded-full blur-3xl"></div>
+    <div className="relative min-h-screen bg-gradient-to-br from-[#2596be]/10 via-sky-50 to-indigo-50 flex items-center justify-center px-4">
+      <Card className="relative w-full max-w-5xl p-6 sm:p-8 bg-white/90 backdrop-blur-sm shadow-xl border-0">
+        {/* header */}
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-[#2596be]">
+            সই — {t("register.title")}
+          </h2>
+          <a
+            href="/login"
+            className="text-sm text-[#2596be] hover:underline"
+          >
+            {t("register.haveAccount")}
+          </a>
+        </div>
 
-      <div className="relative w-full max-w-4xl bg-white/80 backdrop-blur-sm shadow-xl rounded-xl flex flex-col sm:flex-row overflow-hidden border-0">
-        {/* Left: Image/Animation */}
-        <div className="hidden md:flex flex-1 items-center justify-center bg-gradient-to-br from-purple-100 to-blue-100 p-8">
-          <img
-            src="/login_bg.png"
-            alt="Mental Health Illustration"
-            className="w-80 h-80 object-contain drop-shadow-xl"
+        {/* role tabs (kept from design, static for now) */}
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          <Tab
+            active
+            onClick={() => {}}
+            icon={<User className="w-4 h-4" />}
+            label="User / Patient"
+          />
+          <Tab
+            active={false}
+            onClick={() => {}}
+            icon={<Stethoscope className="w-4 h-4" />}
+            label="Specialist"
           />
         </div>
 
-        {/* Right: Register Form */}
-        <div className="flex-1 flex items-center justify-center p-8">
-          <form
-            onSubmit={handleSubmit}
-            className="w-full max-w-md space-y-6"
-          >
-            <h2 className="text-3xl font-bold text-gray-900 mb-6 text-center">{t('register.title')}</h2>
+        {/* form → functionality from rishi, layout from main */}
+        <form onSubmit={handleSubmit} className="grid md:grid-cols-2 gap-8">
+          {/* LEFT Illustration */}
+          <div className="hidden md:flex items-center justify-center">
+            <div className="w-full h-full rounded-2xl bg-gradient-to-br from-[#2596be]/10 to-sky-100 grid place-items-center p-6">
+              <img
+                src="/login.ico"
+                className="w-80 h-80 object-contain drop-shadow"
+                alt="illustration"
+              />
+            </div>
+          </div>
+
+          {/* RIGHT Form */}
+          <div className="space-y-4">
             <Input
               name="name"
-              placeholder={t('register.name')}
+              placeholder={t("register.name")}
               value={form.name}
               onChange={handleChange}
               required
@@ -87,7 +114,7 @@ export default function RegisterPage() {
             <Input
               name="email"
               type="email"
-              placeholder={t('register.email')}
+              placeholder={t("register.email")}
               value={form.email}
               onChange={handleChange}
               required
@@ -95,52 +122,75 @@ export default function RegisterPage() {
             <Input
               name="password"
               type="password"
-              placeholder={t('register.password')}
+              placeholder={t("register.password")}
               value={form.password}
               onChange={handleChange}
               required
             />
             <Input
               name="phone"
-              placeholder={t('register.phone')}
+              placeholder={t("register.phone")}
               value={form.phone}
               onChange={handleChange}
-              required
             />
             <Input
               name="date_of_birth"
               type="date"
-              placeholder={t('register.dob')}
+              placeholder={t("register.dob")}
               value={form.date_of_birth}
               onChange={handleChange}
-              required
             />
             <select
               name="gender"
               value={form.gender}
               onChange={handleChange}
-              className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
-              required
+              className="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#2596be]"
             >
-              <option value="male">{t('register.male')}</option>
-              <option value="female">{t('register.female')}</option>
-              <option value="other">{t('register.other')}</option>
+              <option value="">{t("register.gender")}</option>
+              <option value="male">{t("register.male")}</option>
+              <option value="female">{t("register.female")}</option>
+              <option value="other">{t("register.other")}</option>
             </select>
 
             <Button
               type="submit"
-              className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-lg px-6 py-3 mt-2"
               disabled={loading}
+              className="w-full bg-[#2596be] hover:bg-[#1d7a99] text-white py-2.5 rounded-lg flex items-center justify-center gap-2"
             >
-              {loading ? t('register.loading') : t('register.button')}
+              <ArrowRight className="w-4 h-4" />
+              {loading ? t("register.loading") : t("register.button")}
             </Button>
-            <p className="text-center text-sm text-gray-600">
-              {t('register.haveAccount')}{' '}
-              <a href="/login" className="text-purple-600 hover:underline font-semibold">{t('register.login')}</a>
-            </p>
-          </form>
-        </div>
-      </div>
+          </div>
+        </form>
+      </Card>
     </div>
+  );
+}
+
+/* ---------- small UI helpers ---------- */
+function Tab({
+  active,
+  onClick,
+  icon,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-xl border px-4 py-3 flex items-center justify-center gap-2 transition
+      ${
+        active
+          ? "bg-[#2596be] text-white border-[#2596be]"
+          : "border-gray-300 text-gray-700 hover:bg-gray-50"
+      }`}
+    >
+      {icon} {label}
+    </button>
   );
 }
