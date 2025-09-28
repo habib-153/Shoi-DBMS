@@ -194,5 +194,14 @@
 
 /* Ensure modal content doesn't interfere */
 [data-radix-dialog-overlay] {
-  z-index: 49 !important;
+  z-index: 49 !important;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
 }

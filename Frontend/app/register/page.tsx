@@ -12,6 +12,8 @@ import {
   Syringe,
   Mail,
   Phone,
+
+  Heart,
   FileUp,
   School,
   BadgeCheck,
@@ -66,37 +68,38 @@ export default function RegisterPage() {
     e: ChangeEvent<HTMLInputElement>,
     set: (f: File | null) => void
   ) => set(e.target.files?.[0] ?? null);
-
-  const submit = async (e: React.FormEvent) => {
+const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     let payload;
 
     if (role === "user") {
+      // Validate user fields
       if (!uAnon && !uName)
         return toast.error("Enter a Name or Select Anonymous.");
       if (!uEmail) return toast.error("Enter E-mail");
-
       if (!uPassword) return toast.error("Enter a password");
       if (!uDateOfBirth) return toast.error("Enter your date of birth");
 
       payload = {
         role,
+        anonymous: uAnon,
         name: uName,
         email: uEmail,
-        gender: uGender,
         phone: uPhone,
-        date_of_birth: uDateOfBirth,
-        password: uPassword,
+        blood: uBlood,
+        hobby: uHobby,
+        freeText: uFree,
+        assessment: uAssessment,
       };
     } else {
-      // specialist validation
+      // Specialist validation
       if (!sName || !sEmail) return toast.error("Enter Your Name and E-mail.");
 
       if (specType === "psychologist") {
         if (!pUni) return toast.error("Name the University");
         if (!pCert) return toast.error("Upload Course Completion Certificate");
-        
+
         payload = {
           role,
           type: specType,
@@ -147,13 +150,7 @@ export default function RegisterPage() {
       }
 
       toast.success("Successfully Registered!");
-      setTimeout(() => {
-        if (role === "user") {
-          router.push("/login");
-        } else {
-          router.push("/login");
-        }
-      }, 1500);
+      router.push("/login");
     } catch (error) {
       toast.error("Registration failed. Please try again.");
       console.error("Registration error:", error);
@@ -224,7 +221,8 @@ export default function RegisterPage() {
                   </div>
 
                   <div className="grid sm:grid-cols-2 gap-4 mt-3">
-                    <Field label={`Name${uAnon ? " (Optional)" : ""}`}>
+
+                    <Field label={`Name ${uAnon ? "(Optional)" : ""}`}>
                       <Input
                         disabled={uAnon}
                         placeholder="Your Name"
@@ -281,21 +279,44 @@ export default function RegisterPage() {
                         />
                       </div>
                     </Field>
-                    <Field label="Gender">
-                      <div className="relative">
-                        {!uGender && <User className="w-4 h-4 absolute left-3 top-3 text-gray-400" />}
-                        <select
-                          className={`w-full rounded-md border border-input bg-background text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none h-10 pr-8 ${!uGender ? 'pl-9' : 'pl-3'}`}
-                          value={uGender}
-                          onChange={(e) => setUGender(e.target.value)}
-                          required
-                        >
-                          <option value="" disabled></option>
-                          <option value="male">Male</option>
-                          <option value="female">Female</option>
-                          <option value="other">Other</option>
-                          <option value="prefer_not_to_say">Prefer not to say</option>
-                        </select>
+                   <Field label="Gender">
+  <div className="relative">
+    {!uGender && <User className="w-4 h-4 absolute left-3 top-3 text-gray-400" />}
+    <select
+      className={`w-full rounded-md border border-input bg-background text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none h-10 pr-8 ${!uGender ? 'pl-9' : 'pl-3'}`}
+      value={uGender}
+      onChange={(e) => setUGender(e.target.value)}
+      required
+      title="Gender"
+    >
+      <option value="" disabled>Select Gender</option>
+      <option value="male">Male</option>
+      <option value="female">Female</option>
+      <option value="other">Other</option>
+      <option value="prefer_not_to_say">Prefer not to say</option>
+    </select>
+  </div>
+</Field>
+
+                    <Field label="Blood Group">
+  <div className="relative">
+    {!uBlood && <User className="w-4 h-4 absolute left-3 top-3 text-gray-400" />}
+    <select
+      className="w-full pl-9 pr-3 py-2.5 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#2596be]"
+      value={uBlood}
+      onChange={(e) => setUBlood(e.target.value)}
+      required
+      title="Blood Group"
+    >
+      <option value="">Select Blood Group</option>
+      {["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"].map((g) => (
+        <option key={g} value={g}>
+          {g}
+        </option>
+      ))}
+    </select>
+  </div>
+</Field>
                         <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
                           <ChevronDown className="h-4 w-4 opacity-50" />
                         </div>
@@ -583,6 +604,6 @@ function Field({
     <label className="block">
       <span className="block text-sm mb-1">{label}</span>
       {children}
-    </label>
-  );
+    </label>
+  );
 }

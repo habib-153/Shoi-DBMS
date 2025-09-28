@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { Menu, Calendar, LogIn, ChevronRight } from "lucide-react";
 
+
 const quotes = [
   "It's okay not to be okay. Reach out when you need help.",
   "Mental health is just as important as physical health. Take care of yourself.",
@@ -73,5 +74,6 @@ export default function Navigation() {
         </nav>
       </header>
     </>
+
   );
 }
