@@ -15,24 +15,16 @@ const pool = mysql.createPool({
 export async function POST(req: Request) {
   console.log('Starting registration process...');
   try {
-    const { 
-      name, 
-      email, 
-      password, 
-      phone, 
-      date_of_birth, 
-      gender
-    } = await req.json();
-    
-    console.log('Received registration data:', { name, email, phone, date_of_birth, gender });
+    const data = await req.json();
+    console.log('Received registration data:', data);
 
     // Basic validation
-    if (!name || !email || !password || !phone || !date_of_birth || !gender) {
-      return NextResponse.json(
-        { error: 'সব তথ্য পূরণ করুন' },
-        { status: 400 }
-      );
-    }
+    // if (!data.name || !data.email ) {
+    //   return NextResponse.json(
+    //     { error: 'Please provide name, email and password' },
+    //     { status: 400 }
+    //   );
+    // }
 
     console.log('Attempting to connect to database...');
     // Get a connection from the pool
@@ -43,7 +35,7 @@ export async function POST(req: Request) {
       // Check if user already exists
       const [existingUsers] = await connection.execute(
         'SELECT * FROM users WHERE email = ?',
-        [email]
+        [data.email]
       );
 
       if (Array.isArray(existingUsers) && existingUsers.length > 0) {
@@ -54,12 +46,12 @@ export async function POST(req: Request) {
       }
 
       // Hash password using a simple method (in production, use bcrypt or better)
-      const password_hash = Buffer.from(password).toString('base64');
+      const password_hash = Buffer.from(data.password).toString('base64');
 
       // Insert user
       const [userResult] = await connection.execute(
         'INSERT INTO users (name, email, password_hash, phone, date_of_birth, gender) VALUES (?, ?, ?, ?, ?, ?)',
-        [name, email, password_hash, phone, date_of_birth, gender]
+        [data.name, data.email, password_hash, data.phone || null, data.date_of_birth || null, data.gender || null]
       );
 
       return NextResponse.json(
