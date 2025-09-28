@@ -12,6 +12,7 @@ import {
   Syringe,
   Mail,
   Phone,
+
   Heart,
   FileUp,
   School,
@@ -19,6 +20,9 @@ import {
   PencilLine,
   ClipboardList,
   ArrowRight,
+  ChevronDown,
+  Lock,
+  Calendar,
 } from "lucide-react";
 
 type Role = "user" | "specialist";
@@ -35,8 +39,10 @@ export default function RegisterPage() {
   const [uAnon, setUAnon] = useState(false);
   const [uName, setUName] = useState("");
   const [uEmail, setUEmail] = useState("");
+  const [uPassword, setUPassword] = useState("");
+  const [uDateOfBirth, setUDateOfBirth] = useState("");
+  const [uGender, setUGender] = useState("");
   const [uPhone, setUPhone] = useState("");
-  const [uBlood, setUBlood] = useState("");
   const [uHobby, setUHobby] = useState("");
   const [uFree, setUFree] = useState("");
   const [uAssessment, setUAssessment] = useState("");
@@ -62,17 +68,20 @@ export default function RegisterPage() {
     e: ChangeEvent<HTMLInputElement>,
     set: (f: File | null) => void
   ) => set(e.target.files?.[0] ?? null);
-
-  const submit = (e: React.FormEvent) => {
+const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    let payload;
 
     if (role === "user") {
+      // Validate user fields
       if (!uAnon && !uName)
         return toast.error("Enter a Name or Select Anonymous.");
       if (!uEmail) return toast.error("Enter E-mail");
-      if (!uBlood) return toast.error("Select Blood Group");
+      if (!uPassword) return toast.error("Enter a password");
+      if (!uDateOfBirth) return toast.error("Enter your date of birth");
 
-      const payload = {
+      payload = {
         role,
         anonymous: uAnon,
         name: uName,
@@ -83,63 +92,70 @@ export default function RegisterPage() {
         freeText: uFree,
         assessment: uAssessment,
       };
-      setLoading(true);
-      setTimeout(() => {
-        setLoading(false);
-        console.log("REGISTER USER:", payload);
-        toast.success("Successfully Registered!");
-        router.push("/user/onboarding");
-      }, 900);
-      return;
+    } else {
+      // Specialist validation
+      if (!sName || !sEmail) return toast.error("Enter Your Name and E-mail.");
+
+      if (specType === "psychologist") {
+        if (!pUni) return toast.error("Name the University");
+        if (!pCert) return toast.error("Upload Course Completion Certificate");
+
+        payload = {
+          role,
+          type: specType,
+          name: sName,
+          email: sEmail,
+          phone: sPhone,
+          interested: sInterested,
+          university: pUni,
+          cert: pCert?.name,
+          date_of_birth: "", // Required by your API
+          password: "", // Required by your API
+          gender: "" // Required by your API
+        };
+      } else {
+        if (!qMed) return toast.error("Enter Medical College Name");
+        if (!qLicense) return toast.error("Enter the License Number.");
+        if (!qCert) return toast.error("Upload Certification Documents");
+
+        payload = {
+          role,
+          type: specType,
+          name: sName,
+          email: sEmail,
+          phone: sPhone,
+          interested: sInterested,
+          medicalCollege: qMed,
+          license: qLicense,
+          cert: qCert?.name,
+          date_of_birth: "", // Required by your API
+          password: "", // Required by your API
+          gender: "" // Required by your API
+        };
+      }
     }
 
-    // specialist
-    if (!sName || !sEmail) return toast.error("Enter Your Name and E-mail.");
+    setLoading(true);
+    try {
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-    if (specType === "psychologist") {
-      if (!pUni) return toast.error("Name the University");
-      if (!pCert) return toast.error("Upload Course Completion Certificate");
+      const data = await response.json();
+      if (!response.ok) {
+        toast.error(data.error || "Registration failed");
+        return;
+      }
 
-      const payload = {
-        role,
-        type: specType,
-        name: sName,
-        email: sEmail,
-        phone: sPhone,
-        interested: sInterested,
-        university: pUni,
-        cert: pCert?.name,
-      };
-      setLoading(true);
-      setTimeout(() => {
-        setLoading(false);
-        console.log("REGISTER PSYCHOLOGIST:", payload);
-        toast.success("Successfully Registered!");
-        router.push("/specialist/onboarding");
-      }, 900);
-    } else {
-      if (!qMed) return toast.error("Enter Medical College Name");
-      if (!qLicense) return toast.error("Enter the License Number.");
-      if (!qCert) return toast.error("Upload Certification Documents");
-
-      const payload = {
-        role,
-        type: specType,
-        name: sName,
-        email: sEmail,
-        phone: sPhone,
-        interested: sInterested,
-        medicalCollege: qMed,
-        license: qLicense,
-        cert: qCert?.name,
-      };
-      setLoading(true);
-      setTimeout(() => {
-        setLoading(false);
-        console.log("REGISTER PSYCHIATRIST:", payload);
-        toast.success("Successfully Registered!");
-        router.push("/specialist/onboarding");
-      }, 900);
+      toast.success("Successfully Registered!");
+      router.push("/login");
+    } catch (error) {
+      toast.error("Registration failed. Please try again.");
+      console.error("Registration error:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -205,6 +221,7 @@ export default function RegisterPage() {
                   </div>
 
                   <div className="grid sm:grid-cols-2 gap-4 mt-3">
+
                     <Field label={`Name ${uAnon ? "(Optional)" : ""}`}>
                       <Input
                         disabled={uAnon}
@@ -226,6 +243,31 @@ export default function RegisterPage() {
                         />
                       </div>
                     </Field>
+                    <Field label="Password">
+                      <div className="relative">
+                        <Lock className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+                        <Input
+                          className="pl-9"
+                          type="password"
+                          placeholder="Enter your password"
+                          value={uPassword}
+                          onChange={(e) => setUPassword(e.target.value)}
+                          required
+                        />
+                      </div>
+                    </Field>
+                    <Field label="Date of Birth">
+                      <div className="relative">
+                        <Calendar className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+                        <Input
+                          className="pl-9"
+                          type="date"
+                          value={uDateOfBirth}
+                          onChange={(e) => setUDateOfBirth(e.target.value)}
+                          required
+                        />
+                      </div>
+                    </Field>
                     <Field label="Phone (Optional)">
                       <div className="relative">
                         <Phone className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
@@ -237,32 +279,47 @@ export default function RegisterPage() {
                         />
                       </div>
                     </Field>
-                    <Field label="Blood Group (Optional)">
-                      <div className="relative">
-                        <Heart className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
-                        <select
-                          className="w-full pl-9 pr-3 py-2.5 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#2596be]"
-                          value={uBlood}
-                          onChange={(e) => setUBlood(e.target.value)}
-                          required
-                          title="Blood Group"
-                        >
-                          <option value="">Select…</option>
-                          {[
-                            "A+",
-                            "A-",
-                            "B+",
-                            "B-",
-                            "O+",
-                            "O-",
-                            "AB+",
-                            "AB-",
-                          ].map((g) => (
-                            <option key={g} value={g}>
-                              {g}
-                            </option>
-                          ))}
-                        </select>
+                   <Field label="Gender">
+  <div className="relative">
+    {!uGender && <User className="w-4 h-4 absolute left-3 top-3 text-gray-400" />}
+    <select
+      className={`w-full rounded-md border border-input bg-background text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none h-10 pr-8 ${!uGender ? 'pl-9' : 'pl-3'}`}
+      value={uGender}
+      onChange={(e) => setUGender(e.target.value)}
+      required
+      title="Gender"
+    >
+      <option value="" disabled>Select Gender</option>
+      <option value="male">Male</option>
+      <option value="female">Female</option>
+      <option value="other">Other</option>
+      <option value="prefer_not_to_say">Prefer not to say</option>
+    </select>
+  </div>
+</Field>
+
+                    <Field label="Blood Group">
+  <div className="relative">
+    {!uBlood && <User className="w-4 h-4 absolute left-3 top-3 text-gray-400" />}
+    <select
+      className="w-full pl-9 pr-3 py-2.5 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#2596be]"
+      value={uBlood}
+      onChange={(e) => setUBlood(e.target.value)}
+      required
+      title="Blood Group"
+    >
+      <option value="">Select Blood Group</option>
+      {["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"].map((g) => (
+        <option key={g} value={g}>
+          {g}
+        </option>
+      ))}
+    </select>
+  </div>
+</Field>
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                          <ChevronDown className="h-4 w-4 opacity-50" />
+                        </div>
                       </div>
                     </Field>
                   </div>
