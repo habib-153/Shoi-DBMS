@@ -302,7 +302,7 @@ export default function RegisterPage() {
                   </div>
                 </Field>
 
-                <Field label="Blood Group">
+                {/* <Field label="Blood Group">
                   <div className="relative">
                     {!uBlood && <User className="w-4 h-4 absolute left-3 top-3 text-gray-400" />}
                     <select
@@ -320,7 +320,7 @@ export default function RegisterPage() {
                       ))}
                     </select>
                   </div>
-                </Field>
+                </Field> */}
                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
                   <ChevronDown className="h-4 w-4 opacity-50" />
                 </div>

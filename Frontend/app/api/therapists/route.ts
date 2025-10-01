@@ -11,13 +11,40 @@ const pool = mysql.createPool({
 });
 
 // GET all therapists
-export async function GET() {
+export async function GET(request: Request) {
   console.log('API: Fetching therapists...');
   try {
+    const { searchParams } = new URL(request.url);
+    const specialty_id = searchParams.get('specialty_id');
+    console.log('Specialty ID:', specialty_id);
+    
     const connection = await pool.getConnection();
     console.log('API: Database connection established');
     try {
-      const [rows] = await connection.execute('SELECT * FROM therapists');
+      // First, let's check if the specialties table has data
+      const [specialties] = await connection.execute('SELECT * FROM specialties');
+      console.log('Specialties in database:', specialties);
+
+      // Then check therapists table
+      const [therapists] = await connection.execute('SELECT * FROM therapists');
+      console.log('Therapists in database:', therapists);
+
+      // Check therapist_specialties table
+      const [specialtyMappings] = await connection.execute('SELECT * FROM therapist_specialties');
+      console.log('Specialty mappings in database:', specialtyMappings);
+
+      // Now do our main query with a simpler structure first
+      const query = `
+        SELECT 
+          t.*, 
+          ts.specialty_id
+        FROM therapists t
+        LEFT JOIN therapist_specialties ts ON t.therapist_id = ts.therapist_id
+      `;
+      
+      console.log('Executing query:', query);
+      const [rows] = await connection.execute(query);
+      console.log('Query results:', rows);
       console.log('API: Query executed, rows:', rows);
       return NextResponse.json(rows);
     } finally {
