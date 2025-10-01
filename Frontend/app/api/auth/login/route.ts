@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import mysql from 'mysql2/promise';
+import bcrypt from 'bcrypt';
 
 const pool = mysql.createPool({
   host: process.env.MYSQL_HOST,
@@ -27,30 +28,66 @@ export async function POST(req: Request) {
     console.log('Database connected successfully');
 
     try {
-      // Hash password the same way we did in registration
-      const password_hash = Buffer.from(password).toString('base64');
-
+      // First check users table
       const [users] = await connection.execute(
-        'SELECT * FROM users WHERE email = ? AND password_hash = ?',
-        [email, password_hash]
-      );
+        'SELECT *, "user" as role FROM users WHERE email = ?',
+        [email]
+      ) as [any[], any];
 
-      if (!Array.isArray(users) || users.length === 0) {
+      // If found in users table, verify password
+      if (Array.isArray(users) && users.length > 0) {
+        const user = users[0];
+        // For users, we use base64 encoding (legacy method)
+        const password_hash = Buffer.from(password).toString('base64');
+        
+        if (user.password_hash !== password_hash) {
+          return NextResponse.json(
+            { error: 'ইমেইল অথবা পাসওয়ার্ড ভুল' },
+            { status: 401 }
+          );
+        }
+
+        // Remove sensitive data before sending
+        const { password_hash: _, ...safeUser } = user;
+        return NextResponse.json({
+          message: 'লগইন সফল হয়েছে',
+          user: safeUser,
+          role: 'user'
+        });
+      }
+
+      // If not found in users, check therapists table
+      const [therapists] = await connection.execute(
+        'SELECT *, "therapist" as role FROM therapists WHERE email = ?',
+        [email]
+      ) as [any[], any];
+
+      if (!Array.isArray(therapists) || therapists.length === 0) {
         return NextResponse.json(
           { error: 'ইমেইল অথবা পাসওয়ার্ড ভুল' },
           { status: 401 }
         );
       }
 
-      const user = users[0];
+      const therapistData = therapists[0];
+      // Verify password using bcrypt for therapists
+      const isValidPassword = await bcrypt.compare(password, therapistData.password_hash);
       
-      // Remove sensitive data before sending
-      const { password_hash: _, ...safeUser } = user;
+      if (!isValidPassword) {
+        return NextResponse.json(
+          { error: 'ইমেইল অথবা পাসওয়ার্ড ভুল' },
+          { status: 401 }
+        );
+      }
 
+      // Remove sensitive data before sending
+      const { password_hash: _, ...safeTherapist } = therapistData;
       return NextResponse.json({
         message: 'লগইন সফল হয়েছে',
-        user: safeUser
+        user: safeTherapist,
+        role: 'therapist'
       });
+
     } finally {
       connection.release();
     }

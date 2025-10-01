@@ -3,13 +3,16 @@ import mysql from 'mysql2/promise';
 
 // Create a connection pool
 const pool = mysql.createPool({
-  host: process.env.MYSQL_HOST,
-  user: process.env.MYSQL_USER,
-  password: process.env.MYSQL_PASSWORD,
-  database: process.env.MYSQL_DATABASE,
+  host: 'localhost',
+  port: 3306,
+  user: 'root',
+  password: '',
+  database: 'shoi',
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 0
 });
 
 export async function POST(req: Request) {
@@ -21,15 +24,35 @@ export async function POST(req: Request) {
       password, 
       phone, 
       date_of_birth, 
-      gender
+      gender,
+      hobby,
+      profession,
+      free_text
     } = await req.json();
     
-    console.log('Received registration data:', { name, email, phone, date_of_birth, gender });
+    console.log('Received registration data:', { 
+      name, 
+      email, 
+      phone, 
+      date_of_birth, 
+      gender,
+      hobby,
+      profession,
+      free_text
+    });
 
-    // Basic validation
-    if (!name || !email || !password || !phone || !date_of_birth || !gender) {
+    // Basic validation for required fields
+    if (!email || !password || !date_of_birth) {
       return NextResponse.json(
-        { error: 'সব তথ্য পূরণ করুন' },
+        { error: 'Email, password and date of birth are required' },
+        { status: 400 }
+      );
+    }
+
+    // Name is required (will be "Anonymous" if user chose anonymous option)
+    if (!name) {
+      return NextResponse.json(
+        { error: 'Name is required' },
         { status: 400 }
       );
     }
@@ -56,10 +79,30 @@ export async function POST(req: Request) {
       // Hash password using a simple method (in production, use bcrypt or better)
       const password_hash = Buffer.from(password).toString('base64');
 
-      // Insert user
+      // Insert user with optional fields
       const [userResult] = await connection.execute(
-        'INSERT INTO users (name, email, password_hash, phone, date_of_birth, gender) VALUES (?, ?, ?, ?, ?, ?)',
-        [name, email, password_hash, phone, date_of_birth, gender]
+        `INSERT INTO \`shoi\`.\`users\` (
+          name, 
+          email, 
+          password_hash, 
+          phone, 
+          date_of_birth, 
+          gender,
+          hobby,
+          profession,
+          free_text
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          name,
+          email,
+          password_hash,
+          phone || null,
+          date_of_birth,
+          gender || null,
+          hobby || null,
+          profession || null,
+          free_text || null
+        ]
       );
 
       return NextResponse.json(

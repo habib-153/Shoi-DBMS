@@ -1,4 +1,5 @@
 "use client";
+
 import { useState, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -12,13 +13,12 @@ import {
   Syringe,
   Mail,
   Phone,
-  Heart,
   FileUp,
   School,
   BadgeCheck,
   PencilLine,
   ClipboardList,
-  ArrowRight,
+  Calendar,
 } from "lucide-react";
 
 type Role = "user" | "specialist";
@@ -35,8 +35,10 @@ export default function RegisterPage() {
   const [uAnon, setUAnon] = useState(false);
   const [uName, setUName] = useState("");
   const [uEmail, setUEmail] = useState("");
+  const [uPassword, setUPassword] = useState("");
+  const [uDateOfBirth, setUDateOfBirth] = useState("");
+  const [uGender, setUGender] = useState("");
   const [uPhone, setUPhone] = useState("");
-  const [uBlood, setUBlood] = useState("");
   const [uHobby, setUHobby] = useState("");
   const [uFree, setUFree] = useState("");
   const [uAssessment, setUAssessment] = useState("");
@@ -44,102 +46,113 @@ export default function RegisterPage() {
   // specialist – common
   const [sName, setSName] = useState("");
   const [sEmail, setSEmail] = useState("");
+  const [sPassword, setSPassword] = useState("");
   const [sPhone, setSPhone] = useState("");
   const [sInterested, setSInterested] = useState("");
 
   // psychologist
   const [pUni, setPUni] = useState("");
-  const [pCert, setPCert] = useState<File | null>(null);
+  const [pCertLink, setPCertLink] = useState(""); // Google Drive link
 
   // psychiatrist
   const [qMed, setQMed] = useState("");
   const [qLicense, setQLicense] = useState("");
-  const [qCert, setQCert] = useState<File | null>(null);
+  const [qCertLink, setQCertLink] = useState(""); // Google Drive link
 
   const [loading, setLoading] = useState(false);
 
-  const onFile = (
-    e: ChangeEvent<HTMLInputElement>,
-    set: (f: File | null) => void
-  ) => set(e.target.files?.[0] ?? null);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    let payload;
 
     if (role === "user") {
       if (!uAnon && !uName)
         return toast.error("Enter a Name or Select Anonymous.");
       if (!uEmail) return toast.error("Enter E-mail");
-      if (!uBlood) return toast.error("Select Blood Group");
+      if (!uPassword) return toast.error("Enter a password");
+      if (!uDateOfBirth) return toast.error("Enter your date of birth");
 
-      const payload = {
+      payload = {
         role,
-        anonymous: uAnon,
-        name: uName,
+        name: uAnon ? "Anonymous" : uName,
         email: uEmail,
-        phone: uPhone,
-        blood: uBlood,
-        hobby: uHobby,
-        freeText: uFree,
-        assessment: uAssessment,
+        gender: uGender || null,
+        phone: uPhone || null,
+        date_of_birth: uDateOfBirth,
+        password: uPassword,
+        hobby: uHobby || null,
+        profession: uFree || null,
+        free_text: uAssessment || null
       };
-      setLoading(true);
-      setTimeout(() => {
-        setLoading(false);
-        console.log("REGISTER USER:", payload);
-        toast.success("Successfully Registered!");
-        router.push("/user/onboarding");
-      }, 900);
-      return;
+    } else {
+      // specialist validation
+      if (!sName || !sEmail || !sPassword) return toast.error("Enter Your Name, E-mail and Password.");
+
+      if (specType === "psychologist") {
+        if (!pUni) return toast.error("Name the University");
+        if (!pCertLink) return toast.error("Enter Course Certificate Google Drive Link");
+        
+        payload = {
+          name: sName,
+          email: sEmail,
+          password: sPassword,
+          university: pUni, // will be stored in educational_info
+          certificate: pCertLink, // Google Drive link will be stored in image column
+          interested: sInterested || null // will be stored in interested_field
+        };
+      } else {
+        if (!qMed) return toast.error("Enter Medical College Name");
+        if (!qLicense) return toast.error("Enter the License Number.");
+        if (!qCertLink) return toast.error("Enter Certification Documents Google Drive Link");
+
+        payload = {
+          name: sName,
+          email: sEmail,
+          password: sPassword,
+          university: qMed, // will be stored in educational_info
+          certificate: qCertLink, // Google Drive link will be stored in image column
+          license_no: qLicense,
+          interested: sInterested || null // will be stored in interested_field
+        };
+      }
     }
 
-    // specialist
-    if (!sName || !sEmail) return toast.error("Enter Your Name and E-mail.");
+    setLoading(true);
+    try {
+      let response;
+      if (role === "user") {
+        // User registration using auth/register API
+        response = await fetch("/api/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        // Specialist registration using therapists API
+        response = await fetch("/api/therapists", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      }
 
-    if (specType === "psychologist") {
-      if (!pUni) return toast.error("Name the University");
-      if (!pCert) return toast.error("Upload Course Completion Certificate");
+      const data = await response.json();
+      if (!response.ok) {
+        toast.error(data.error || "Registration failed");
+        return;
+      }
 
-      const payload = {
-        role,
-        type: specType,
-        name: sName,
-        email: sEmail,
-        phone: sPhone,
-        interested: sInterested,
-        university: pUni,
-        cert: pCert?.name,
-      };
-      setLoading(true);
+      toast.success("Successfully Registered!");
       setTimeout(() => {
-        setLoading(false);
-        console.log("REGISTER PSYCHOLOGIST:", payload);
-        toast.success("Successfully Registered!");
-        router.push("/specialist/onboarding");
-      }, 900);
-    } else {
-      if (!qMed) return toast.error("Enter Medical College Name");
-      if (!qLicense) return toast.error("Enter the License Number.");
-      if (!qCert) return toast.error("Upload Certification Documents");
-
-      const payload = {
-        role,
-        type: specType,
-        name: sName,
-        email: sEmail,
-        phone: sPhone,
-        interested: sInterested,
-        medicalCollege: qMed,
-        license: qLicense,
-        cert: qCert?.name,
-      };
-      setLoading(true);
-      setTimeout(() => {
-        setLoading(false);
-        console.log("REGISTER PSYCHIATRIST:", payload);
-        toast.success("Successfully Registered!");
-        router.push("/specialist/onboarding");
-      }, 900);
+        router.push("/login");
+      }, 1500);
+    } catch (error) {
+      toast.error("Registration failed. Please try again.");
+      console.error("Registration error:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -168,7 +181,7 @@ export default function RegisterPage() {
             active={role === "specialist"}
             onClick={() => setRole("specialist")}
             icon={<Stethoscope className="w-4 h-4" />}
-            label="specialist"
+            label="Specialist"
           />
         </div>
 
@@ -198,35 +211,58 @@ export default function RegisterPage() {
                         type="checkbox"
                         className="accent-[#2596be]"
                         checked={uAnon}
-                        onChange={(e) => setUAnon(e.target.checked)}
+                        onChange={(e) => {
+                          setUAnon(e.target.checked);
+                          if (e.target.checked) {
+                            setUName(""); // Clear name when anonymous is selected
+                          }
+                        }}
                       />
                       Anonymous User
                     </label>
                   </div>
 
                   <div className="grid sm:grid-cols-2 gap-4 mt-3">
-                    <Field label={`Name ${uAnon ? "(Optional)" : ""}`}>
+                    {!uAnon && (
+                      <Field label="Name">
+                        <Input
+                          placeholder="Your Name"
+                          value={uName}
+                          onChange={(e) => setUName(e.target.value)}
+                        />
+                      </Field>
+                    )}
+                    <Field label="E-Mail">
                       <Input
-                        disabled={uAnon}
-                        placeholder="Your Name"
-                        value={uName}
-                        onChange={(e) => setUName(e.target.value)}
+                        type="email"
+                        placeholder="name@email.com"
+                        value={uEmail}
+                        onChange={(e) => setUEmail(e.target.value)}
+                        required
                       />
                     </Field>
-                    <Field label="E-Mail">
+                    <Field label="Password">
+                      <Input
+                        type="password"
+                        placeholder="Enter Password"
+                        value={uPassword}
+                        onChange={(e) => setUPassword(e.target.value)}
+                        required
+                      />
+                    </Field>
+                    <Field label="Date of Birth">
                       <div className="relative">
-                        <Mail className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+                        <Calendar className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
                         <Input
                           className="pl-9"
-                          type="email"
-                          placeholder="name@email.com"
-                          value={uEmail}
-                          onChange={(e) => setUEmail(e.target.value)}
+                          type="date"
+                          value={uDateOfBirth}
+                          onChange={(e) => setUDateOfBirth(e.target.value)}
                           required
                         />
                       </div>
                     </Field>
-                    <Field label="Phone (Optional)">
+                    <Field label="Phone">
                       <div className="relative">
                         <Phone className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
                         <Input
@@ -237,31 +273,18 @@ export default function RegisterPage() {
                         />
                       </div>
                     </Field>
-                    <Field label="Blood Group (Optional)">
+                    <Field label="Gender">
                       <div className="relative">
-                        <Heart className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+                        {!uGender && <User className="w-4 h-4 absolute left-3 top-3 text-gray-400" />}
                         <select
-                          className="w-full pl-9 pr-3 py-2.5 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#2596be]"
-                          value={uBlood}
-                          onChange={(e) => setUBlood(e.target.value)}
-                          required
-                          title="Blood Group"
+                          className={`w-full rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#2596be] appearance-none text-gray-500 ${!uGender ? 'pl-9' : 'pl-3'} py-2`}
+                          value={uGender}
+                          onChange={(e) => setUGender(e.target.value)}
                         >
-                          <option value="">Select…</option>
-                          {[
-                            "A+",
-                            "A-",
-                            "B+",
-                            "B-",
-                            "O+",
-                            "O-",
-                            "AB+",
-                            "AB-",
-                          ].map((g) => (
-                            <option key={g} value={g}>
-                              {g}
-                            </option>
-                          ))}
+                          <option value="" disabled hidden className="text-gray-500">Select</option>
+                          <option value="male">Male</option>
+                          <option value="female">Female</option>
+                          <option value="other">Other</option>
                         </select>
                       </div>
                     </Field>
@@ -273,16 +296,16 @@ export default function RegisterPage() {
                   icon={<PencilLine className="w-4 h-4 text-[#2596be]" />}
                 >
                   <div className="grid sm:grid-cols-2 gap-4">
-                    <Field label="Hobby (Optional)">
+                    <Field label="Your Hobby (Optional)">
                       <Input
-                        placeholder="Reading, Music, Travelling…"
+                        placeholder="Gaming, Music..."
                         value={uHobby}
                         onChange={(e) => setUHobby(e.target.value)}
                       />
                     </Field>
                     <Field label="Profession (Optional)">
                       <Input
-                        placeholder="Entrepreneur, Housewife, Freelencer....."
+                        placeholder="Student, Engineer..."
                         value={uFree}
                         onChange={(e) => setUFree(e.target.value)}
                       />
@@ -291,12 +314,12 @@ export default function RegisterPage() {
                 </Section>
 
                 <Section
-                  title="Free Text (Optional)"
+                  title="Additional Information (Optional)"
                   icon={<ClipboardList className="w-4 h-4 text-[#2596be]" />}
                 >
                   <textarea
                     className="w-full min-h-[120px] rounded-md border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#2596be]"
-                    placeholder="How are you feeling, What support do you want — Write Briefly…"
+                    placeholder="How are you feeling? What kind of support are you looking for?"
                     value={uAssessment}
                     onChange={(e) => setUAssessment(e.target.value)}
                   />
@@ -326,7 +349,7 @@ export default function RegisterPage() {
                   icon={<Stethoscope className="w-4 h-4 text-[#2596be]" />}
                 >
                   <div className="grid sm:grid-cols-2 gap-4">
-                    <Field label="Name">
+                    <Field label="Full Name">
                       <Input
                         placeholder="Your Name"
                         value={sName}
@@ -343,16 +366,25 @@ export default function RegisterPage() {
                         required
                       />
                     </Field>
-                    <Field label="Phone (Optional)">
+                    <Field label="Password">
+                      <Input
+                        type="password"
+                        placeholder="Enter secure password"
+                        value={sPassword}
+                        onChange={(e) => setSPassword(e.target.value)}
+                        required
+                      />
+                    </Field>
+                    <Field label="Phone">
                       <Input
                         placeholder="+8801XXXXXXXXX"
                         value={sPhone}
                         onChange={(e) => setSPhone(e.target.value)}
                       />
                     </Field>
-                    <Field label="Interested Fields (Optional)">
+                    <Field label="Interested In">
                       <Input
-                        placeholder="Anxiety, Depression, Couples…"
+                        placeholder="Depression, Anxiety..."
                         value={sInterested}
                         onChange={(e) => setSInterested(e.target.value)}
                       />
@@ -366,34 +398,26 @@ export default function RegisterPage() {
                     title="Psychologist — Educational Information"
                     icon={<School className="w-4 h-4 text-[#2596be]" />}
                   >
-                    <div className="grid sm:grid-cols-2 gap-4">
-                      <Field label="BSc Completed — University">
+                    <div className="space-y-4">
+                      <Field label="University">
                         <Input
-                          placeholder="University of Dhaka"
+                          placeholder="University Name"
                           value={pUni}
                           onChange={(e) => setPUni(e.target.value)}
                           required
                         />
                       </Field>
-                      <Field label="Course Completion Certificate (PDF/JPG/PNG)">
-                        <div className="flex items-center gap-3">
-                          <label className="inline-flex items-center gap-2 text-sm cursor-pointer">
-                            <input
-                              type="file"
-                              accept=".pdf,.jpg,.jpeg,.png"
-                              onChange={(e) => onFile(e, setPCert)}
-                              className="hidden"
-                              id="pCert"
-                            />
-                            <span className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-[#2596be] text-white">
-                              <FileUp className="w-4 h-4" /> Upload
-                            </span>
-                          </label>
-                          {pCert && (
-                            <span className="text-xs text-gray-600 truncate">
-                              {pCert.name}
-                            </span>
-                          )}
+                      <Field label="Course Certificate (Google Drive Link)">
+                        <div className="relative">
+                          <FileUp className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+                          <Input
+                            className="pl-9"
+                            type="text"
+                            placeholder="Paste Google Drive link here"
+                            value={pCertLink}
+                            onChange={(e) => setPCertLink(e.target.value)}
+                            required
+                          />
                         </div>
                       </Field>
                     </div>
@@ -407,9 +431,9 @@ export default function RegisterPage() {
                     icon={<BadgeCheck className="w-4 h-4 text-[#2596be]" />}
                   >
                     <div className="grid sm:grid-cols-2 gap-4">
-                      <Field label="MBBS Medical College (Optional)">
+                      <Field label="Medical College">
                         <Input
-                          placeholder="DMC"
+                          placeholder="Medical College Name"
                           value={qMed}
                           onChange={(e) => setQMed(e.target.value)}
                           required
@@ -417,31 +441,23 @@ export default function RegisterPage() {
                       </Field>
                       <Field label="License Number">
                         <Input
-                          placeholder="BMDC-XXXX"
+                          placeholder="BMDC Registration Number"
                           value={qLicense}
                           onChange={(e) => setQLicense(e.target.value)}
                           required
                         />
                       </Field>
-                      <Field label="Certification / License (PDF/JPG/PNG)">
-                        <div className="flex items-center gap-3">
-                          <label className="inline-flex items-center gap-2 text-sm cursor-pointer">
-                            <input
-                              type="file"
-                              accept=".pdf,.jpg,.jpeg,.png"
-                              onChange={(e) => onFile(e, setQCert)}
-                              className="hidden"
-                              id="qCert"
-                            />
-                            <span className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-[#2596be] text-white">
-                              <FileUp className="w-4 h-4" /> Upload
-                            </span>
-                          </label>
-                          {qCert && (
-                            <span className="text-xs text-gray-600 truncate">
-                              {qCert.name}
-                            </span>
-                          )}
+                      <Field label="Certification Documents (Google Drive Link)" className="col-span-2">
+                        <div className="relative">
+                          <FileUp className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+                          <Input
+                            className="pl-9"
+                            type="text"
+                            placeholder="Paste Google Drive link here"
+                            value={qCertLink}
+                            onChange={(e) => setQCertLink(e.target.value)}
+                            required
+                          />
                         </div>
                       </Field>
                     </div>
@@ -455,7 +471,6 @@ export default function RegisterPage() {
               disabled={loading}
               className="w-full bg-[#2596be] hover:bg-[#1d7a99] text-white py-2.5 rounded-lg flex items-center justify-center gap-2"
             >
-              <ArrowRight className="w-4 h-4" />
               {loading ? "Registering..." : "Complete the Registration"}
             </Button>
           </div>
@@ -492,6 +507,7 @@ function Tab({
     </button>
   );
 }
+
 function SmallTab({
   active,
   onClick,
@@ -518,6 +534,7 @@ function SmallTab({
     </button>
   );
 }
+
 function Section({
   title,
   icon,
@@ -536,15 +553,18 @@ function Section({
     </div>
   );
 }
+
 function Field({
   label,
   children,
+  className = "",
 }: {
   label: string;
   children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <label className="block">
+    <label className={`block ${className}`}>
       <span className="block text-sm mb-1">{label}</span>
       {children}
     </label>
