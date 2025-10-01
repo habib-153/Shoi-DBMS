@@ -15,7 +15,7 @@ export default function Banner() {
         </p>
 
         <div className="mt-8 flex flex-col sm:flex-row gap-4">
-          <Link href="/appointment" className="inline-flex items-center gap-2 bg-[#2596be] text-white px-5 py-3 rounded-xl hover:bg-[#1d7a99]">
+          <Link href="/appointments" className="inline-flex items-center gap-2 bg-[#2596be] text-white px-5 py-3 rounded-xl hover:bg-[#1d7a99]">
             <Calendar className="w-5 h-5" /> Book an Appointment
           </Link>
           <a href="tel:01776632344" className="inline-flex items-center gap-2 border border-[#2596be] text-[#2596be] px-5 py-3 rounded-xl hover:bg-[#2596be]/10">

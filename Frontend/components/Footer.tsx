@@ -42,7 +42,7 @@ export default function Footer() {
           © 2025 <span className="font-semibold text-[#2596be]">সই</span>™. All Rights Reserved. Version 25.7.0 ·{" "}
           <Link href="/about" className="hover:text-gray-700">About</Link> ·{" "}
           <Link href="/privacy" className="hover:text-gray-700">Privacy Policy</Link> ·{" "}
-          <Link href="/appointment" className="hover:text-gray-700">Book a session</Link>
+          <Link href="/appointments" className="hover:text-gray-700">Book a session</Link>
         </div>
       </div>
     </footer>

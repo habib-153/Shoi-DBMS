@@ -3,28 +3,59 @@ import mysql from 'mysql2/promise';
 
 // Create a connection pool
 const pool = mysql.createPool({
-  host: process.env.MYSQL_HOST,
-  user: process.env.MYSQL_USER,
-  password: process.env.MYSQL_PASSWORD,
-  database: process.env.MYSQL_DATABASE,
+  host: 'localhost',
+  port: 3306,
+  user: 'root',
+  password: '',
+  database: 'shoi',
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 0
 });
 
 export async function POST(req: Request) {
   console.log('Starting registration process...');
   try {
-    const data = await req.json();
-    console.log('Received registration data:', data);
+    const { 
+      name, 
+      email, 
+      password, 
+      phone, 
+      date_of_birth, 
+      gender,
+      hobby,
+      profession,
+      free_text
+    } = await req.json();
+    
+    console.log('Received registration data:', { 
+      name, 
+      email, 
+      phone, 
+      date_of_birth, 
+      gender,
+      hobby,
+      profession,
+      free_text
+    });
 
-    // Basic validation
-    // if (!data.name || !data.email ) {
-    //   return NextResponse.json(
-    //     { error: 'Please provide name, email and password' },
-    //     { status: 400 }
-    //   );
-    // }
+    // Basic validation for required fields
+    if (!email || !password || !date_of_birth) {
+      return NextResponse.json(
+        { error: 'Email, password and date of birth are required' },
+        { status: 400 }
+      );
+    }
+
+    // Name is required (will be "Anonymous" if user chose anonymous option)
+    if (!name) {
+      return NextResponse.json(
+        { error: 'Name is required' },
+        { status: 400 }
+      );
+    }
 
     console.log('Attempting to connect to database...');
     // Get a connection from the pool
@@ -48,10 +79,31 @@ export async function POST(req: Request) {
       // Hash password using a simple method (in production, use bcrypt or better)
       const password_hash = Buffer.from(data.password).toString('base64');
 
-      // Insert user
+      // Insert user with optional fields
       const [userResult] = await connection.execute(
-        'INSERT INTO users (name, email, password_hash, phone, date_of_birth, gender) VALUES (?, ?, ?, ?, ?, ?)',
-        [data.name, data.email, password_hash, data.phone || null, data.date_of_birth || null, data.gender || null]
+
+        `INSERT INTO \`shoi\`.\`users\` (
+          name, 
+          email, 
+          password_hash, 
+          phone, 
+          date_of_birth, 
+          gender,
+          hobby,
+          profession,
+          free_text
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          name,
+          email,
+          password_hash,
+          phone || null,
+          date_of_birth,
+          gender || null,
+          hobby || null,
+          profession || null,
+          free_text || null
+        ]
       );
 
       return NextResponse.json(
