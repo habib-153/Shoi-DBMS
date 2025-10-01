@@ -45,9 +45,16 @@ export default function LoginPage() {
         return;
       }
 
+      // Store user data in localStorage
+      localStorage.setItem('user', JSON.stringify(data.user));
+      localStorage.setItem('userRole', data.role || 'user');
+      
+      // Dispatch custom event to notify navigation component
+      window.dispatchEvent(new Event('userLoggedIn'));
+
       toast.success(t("login.success"));
-      if (role === "specialist") {
-        router.push("/therapists");
+      if (data.role === "therapist") {
+        router.push("/therapist/dashboard");
       } else {
         router.push("/dashboard");
       }
@@ -69,8 +76,8 @@ export default function LoginPage() {
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <label className="block text-sm mb-1">E-mail</label>
-            <div className="relative">
-              <Mail className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+            <div className="relative flex items-center">
+              <Mail className="w-4 h-4 absolute left-3 text-gray-400 z-10" />
               <input
                 type="email"
                 className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#2596be]"
@@ -84,8 +91,8 @@ export default function LoginPage() {
 
           <div>
             <label className="block text-sm mb-1">Password</label>
-            <div className="relative">
-              <Lock className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+            <div className="relative flex items-center">
+              <Lock className="w-4 h-4 absolute left-3 text-gray-400 z-10" />
               <input
                 type={showPw ? "text" : "password"}
                 className="w-full pl-9 pr-10 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#2596be]"
@@ -97,7 +104,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => setShowPw((s) => !s)}
-                className="absolute right-3 top-2.5 text-gray-500 hover:text-gray-700"
+                className="absolute right-3 text-gray-500 hover:text-gray-700 z-10"
                 aria-label="Toggle password"
               >
                 {showPw ? (
