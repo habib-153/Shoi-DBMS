@@ -14,6 +14,10 @@ interface Therapist {
   phone: string;
   qualifications: string;
   specialties: string;
+  specialty_id: number;
+  education: string;
+  experience: string;
+  license: string;
 }
 
 export default function TherapistsPage() {
@@ -164,27 +168,97 @@ export default function TherapistsPage() {
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {therapists.map((therapist) => (
-          <Card key={therapist.therapist_id} className="p-6">
-            <h3 className="text-xl font-semibold mb-2">{therapist.name}</h3>
-            <p className="text-gray-600 mb-1">{therapist.email}</p>
-            <p className="text-gray-600 mb-1">{therapist.phone}</p>
-            <p className="text-gray-600 mb-2">{therapist.qualifications}</p>
-            {therapist.specialties && (
-              <div className="flex flex-wrap gap-2">
-                {therapist.specialties.split(",").map((specialty, index) => (
-                  <span
-                    key={index}
-                    className="bg-purple-100 text-purple-800 text-sm px-2 py-1 rounded"
-                  >
-                    {specialty.trim()}
-                  </span>
-                ))}
-              </div>
-            )}
-          </Card>
-        ))}
+      <div className="space-y-12">
+        {/* Psychiatrists Section */}
+        <div>
+          <h2 className="text-2xl font-bold mb-6">Psychiatrists</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {therapists
+              .filter(t => t.specialty_id === 2 || t.license)
+              .map((therapist) => (
+                <Card key={therapist.therapist_id} className="p-6">
+                  <h3 className="text-xl font-semibold mb-2">{therapist.name}</h3>
+                  <div className="space-y-2">
+                    <p className="text-gray-600">{therapist.email}</p>
+                    <p className="text-gray-600">{therapist.phone}</p>
+                    {therapist.education && (
+                      <p className="text-gray-800">
+                        <span className="font-semibold">Education:</span> {therapist.education}
+                      </p>
+                    )}
+                    {therapist.experience && (
+                      <p className="text-gray-800">
+                        <span className="font-semibold">Experience:</span> {therapist.experience}
+                      </p>
+                    )}
+                    {therapist.license && (
+                      <p className="text-green-600">
+                        <span className="font-semibold">License:</span> {therapist.license}
+                      </p>
+                    )}
+                    <p className="text-gray-800">
+                      <span className="font-semibold">Qualifications:</span> {therapist.qualifications}
+                    </p>
+                    {therapist.specialties && (
+                      <div className="flex flex-wrap gap-2">
+                        {therapist.specialties.split(",").map((specialty, index) => (
+                          <span
+                            key={index}
+                            className="bg-purple-100 text-purple-800 text-sm px-2 py-1 rounded"
+                          >
+                            {specialty.trim()}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              ))}
+          </div>
+        </div>
+
+        {/* Psychologists Section */}
+        <div>
+          <h2 className="text-2xl font-bold mb-6">Psychologists</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {therapists
+              .filter(t => (t.specialty_id === 1 || !t.specialty_id) && !t.license)
+              .map((therapist) => (
+                <Card key={therapist.therapist_id} className="p-6">
+                  <h3 className="text-xl font-semibold mb-2">{therapist.name}</h3>
+                  <div className="space-y-2">
+                    <p className="text-gray-600">{therapist.email}</p>
+                    <p className="text-gray-600">{therapist.phone}</p>
+                    {therapist.education && (
+                      <p className="text-gray-800">
+                        <span className="font-semibold">Education:</span> {therapist.education}
+                      </p>
+                    )}
+                    {therapist.experience && (
+                      <p className="text-gray-800">
+                        <span className="font-semibold">Experience:</span> {therapist.experience}
+                      </p>
+                    )}
+                    <p className="text-gray-800">
+                      <span className="font-semibold">Qualifications:</span> {therapist.qualifications}
+                    </p>
+                    {therapist.specialties && (
+                      <div className="flex flex-wrap gap-2">
+                        {therapist.specialties.split(",").map((specialty, index) => (
+                          <span
+                            key={index}
+                            className="bg-purple-100 text-purple-800 text-sm px-2 py-1 rounded"
+                          >
+                            {specialty.trim()}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              ))}
+          </div>
+        </div>
       </div>
     </div>
   );

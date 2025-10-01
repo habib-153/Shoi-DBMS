@@ -4,6 +4,17 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { Menu, LogIn, Calendar, User, Settings, LogOut, MessageCircle } from "lucide-react";
 
+const quotes = [
+  "It's okay not to be okay. Reach out when you need help.",
+  "Mental health is just as important as physical health. Take care of yourself.",
+  "You are stronger than you think. Keep going.",
+  "Healing takes time, and asking for help is a courageous step.",
+  "Self-care is not selfish; it’s a necessity.",
+  "It’s okay to have bad days. It’s okay to ask for help. You are not alone.",
+  "Your mental health is a priority. Take care of yourself first.",
+  "Start where you are. Use what you have. Do what you can."
+];
+
 export default function Navigation() {
   const [open, setOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -79,6 +90,10 @@ export default function Navigation() {
   };
 
   return (
+    <>
+       <div className="bg-[WHITE]] text-[black] text-center py-0.2">
+        <p className="text-sm italic animate-marquee">{quote}</p>
+      </div>
     <header className="sticky top-0 z-50">
       {/* <div className="w-full bg-[#2596be] text-white text-center text-sm py-2">
         Our prices have been updated. Please check the latest rates before booking.
@@ -266,5 +281,6 @@ export default function Navigation() {
         </div>
       </nav>
     </header>
+      </>
   );
 }

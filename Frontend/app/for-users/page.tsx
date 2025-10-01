@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { Heart, Clock, Shield, MessageCircle, Users, CheckCircle, Star, ArrowRight } from "lucide-react";
 

@@ -1,5 +1,14 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
 import mysql from 'mysql2/promise';
+import { query } from "@/lib/db";
+import { z } from "zod";
+
+const Body = z.object({
+  user_id: z.number(),
+  therapist_id: z.number(),
+  start_time: z.string(), // "YYYY-MM-DD HH:mm:ss"
+  end_time: z.string(),
+});
 
 const pool = mysql.createPool({
   host: process.env.MYSQL_HOST || 'localhost',
@@ -84,154 +93,37 @@ export async function GET(req: Request) {
   }
 }
 
-// POST - Create new appointment following your schema
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const {
-      user_id,
-      therapist_id,
-      start_time,
-      end_time,
-      status = 'pending'
-    } = await req.json();
+    const json = await req.json();
+    const parsed = Body.parse(json);
 
-    // Validate required fields according to your schema
-    if (!user_id || !therapist_id || !start_time || !end_time) {
-      return NextResponse.json(
-        { error: 'user_id, therapist_id, start_time, and end_time are required' },
-        { status: 400 }
-      );
-    }
-
-    // Validate status according to your schema
-    const validStatuses = ['scheduled', 'pending', 'cancelled', 'completed'];
-    if (!validStatuses.includes(status)) {
-      return NextResponse.json(
-        { error: 'Invalid status. Must be one of: ' + validStatuses.join(', ') },
-        { status: 400 }
-      );
-    }
-
-    // Validate date/time (should be in the future)
-    const appointmentStart = new Date(start_time);
-    const now = new Date();
-    
-    if (appointmentStart <= now) {
-      return NextResponse.json(
-        { error: 'Appointment time must be in the future' },
-        { status: 400 }
-      );
-    }
-
-    const connection = await pool.getConnection();
-    
-    try {
-      await connection.beginTransaction();
-
-      // Check if user exists using your schema field names
-      const [users] = await connection.execute(
-        'SELECT user_id, name, email FROM users WHERE user_id = ?',
-        [user_id]
-      );
-
-      if (!Array.isArray(users) || users.length === 0) {
-        await connection.rollback();
-        return NextResponse.json(
-          { error: 'User not found' },
-          { status: 404 }
-        );
-      }
-
-      // Check if therapist exists using your schema field names
-      const [therapists] = await connection.execute(
-        'SELECT therapist_id, name, email FROM therapists WHERE therapist_id = ?',
-        [therapist_id]
-      );
-
-      if (!Array.isArray(therapists) || therapists.length === 0) {
-        await connection.rollback();
-        return NextResponse.json(
-          { error: 'Therapist not found' },
-          { status: 404 }
-        );
-      }
-
-      // Check for conflicting appointments (same therapist, overlapping time)
-      const [conflicts] = await connection.execute(
-        `SELECT appointment_id FROM appointments 
-         WHERE therapist_id = ? 
-         AND status IN ('scheduled', 'pending') 
-         AND (
-           (start_time <= ? AND end_time > ?) OR
-           (start_time < ? AND end_time >= ?) OR
-           (start_time >= ? AND end_time <= ?)
-         )`,
-        [therapist_id, start_time, start_time, end_time, end_time, start_time, end_time]
-      );
-
-      if (Array.isArray(conflicts) && conflicts.length > 0) {
-        await connection.rollback();
-        return NextResponse.json(
-          { error: 'This time slot conflicts with an existing appointment. Please choose a different time.' },
-          { status: 409 }
-        );
-      }
-
-      // Create the appointment using your exact schema
-      const [result] = await connection.execute(
-        `INSERT INTO appointments (
-          user_id, 
-          therapist_id, 
-          start_time, 
-          end_time, 
-          status, 
-          created_at
-        ) VALUES (?, ?, ?, ?, ?, NOW())`,
-        [user_id, therapist_id, start_time, end_time, status]
-      );
-
-      const appointmentId = (result as any).insertId;
-      
-      await connection.commit();
-
-      // Fetch the complete appointment data to return
-      const [newAppointment] = await connection.execute(`
-        SELECT 
-          a.appointment_id,
-          a.user_id,
-          a.therapist_id,
-          a.start_time,
-          a.end_time,
-          a.status,
-          a.created_at,
-          u.name as user_name,
-          u.email as user_email,
-          t.name as therapist_name,
-          t.educational_info
-        FROM appointments a
-        LEFT JOIN users u ON a.user_id = u.user_id
-        LEFT JOIN therapists t ON a.therapist_id = t.therapist_id
-        WHERE a.appointment_id = ?
-      `, [appointmentId]);
-
-      return NextResponse.json({
-        message: 'Appointment created successfully',
-        appointment: Array.isArray(newAppointment) ? newAppointment[0] : null
-      });
-
-    } catch (dbError) {
-      await connection.rollback();
-      throw dbError;
-    } finally {
-      connection.release();
-    }
-
-  } catch (error) {
-    console.error('Error creating appointment:', error);
-    return NextResponse.json(
-      { error: 'Failed to create appointment. Please try again.' },
-      { status: 500 }
+    // clash check
+    const [{ c: clashCount }] = await query<{ c: number }>(
+      `
+      SELECT COUNT(*) as c
+      FROM appointments
+      WHERE therapist_id = ?
+        AND ((start_time < ? AND end_time > ?) OR (start_time >= ? AND start_time < ?))
+        AND status IN ('pending','confirmed','paid')
+      `,
+      [parsed.therapist_id, parsed.end_time, parsed.start_time, parsed.start_time, parsed.end_time]
     );
+
+    if (clashCount > 0) {
+      return NextResponse.json({ ok: false, message: "This time slot is no longer available" }, { status: 409 });
+    }
+
+    const result: any = await query(
+      `INSERT INTO appointments (user_id, therapist_id, start_time, end_time, status)
+       VALUES (?, ?, ?, ?, 'pending')`,
+      [parsed.user_id, parsed.therapist_id, parsed.start_time, parsed.end_time]
+    );
+
+    return NextResponse.json({ ok: true, appointment_id: result.insertId, message: "Appointment created successfully" });
+  } catch (error) {
+    console.error("Error creating appointment:", error);
+    return NextResponse.json({ ok: false, message: "Failed to create appointment" }, { status: 500 });
   }
 }
 

@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { Users, Calendar, Shield, TrendingUp, Clock, Globe, CheckCircle, Star, DollarSign } from "lucide-react";
 

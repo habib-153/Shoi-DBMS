@@ -1,7 +1,6 @@
-@import "tailwindcss";
-@import "tw-animate-css";
-
-@custom-variant dark (&:is(.dark *));
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 @theme inline {
   --color-background: var(--background);
@@ -59,14 +58,6 @@
   --color-surface-800: var(--surface-800);
   --color-surface-900: var(--surface-900);
 
-  /* Add platform colors */
-  --color-platform-foodpanda: var(--platform-foodpanda);
-  --color-platform-foodi: var(--platform-foodi);
-
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
 }
 
 :root {
@@ -227,8 +218,8 @@
   font-weight: 600 !important;
   color: #2d3748 !important;
 }
-
 .pac-icon {
+
   margin-right: 0.75rem !important;
 }
 
@@ -247,11 +238,27 @@
   z-index: 49 !important;
 }
 
+@keyframes marquee {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-marquee {
+  display: inline-block;
+  white-space: nowrap;
+  animation: marquee 8s linear infinite; /* Adjust speed by changing 8s */
+}
+
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply  text-foreground;
   }
 }

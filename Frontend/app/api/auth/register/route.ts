@@ -66,7 +66,7 @@ export async function POST(req: Request) {
       // Check if user already exists
       const [existingUsers] = await connection.execute(
         'SELECT * FROM users WHERE email = ?',
-        [email]
+        [data.email]
       );
 
       if (Array.isArray(existingUsers) && existingUsers.length > 0) {
@@ -77,10 +77,11 @@ export async function POST(req: Request) {
       }
 
       // Hash password using a simple method (in production, use bcrypt or better)
-      const password_hash = Buffer.from(password).toString('base64');
+      const password_hash = Buffer.from(data.password).toString('base64');
 
       // Insert user with optional fields
       const [userResult] = await connection.execute(
+
         `INSERT INTO \`shoi\`.\`users\` (
           name, 
           email, 

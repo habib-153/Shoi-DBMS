@@ -16,34 +16,43 @@ const pool = mysql.createPool({
 });
 
 // GET all therapists
-export async function GET() {
+export async function GET(request: Request) {
+  console.log('API: Fetching therapists...');
+
   try {
+    const { searchParams } = new URL(request.url);
+    const specialty_id = searchParams.get('specialty_id');
+    console.log('Specialty ID:', specialty_id);
+    
     const connection = await pool.getConnection();
     
     try {
-      const [therapists] = await connection.execute(`
-        SELECT 
-          id as therapist_id,
-          name,
-          email,
-          license_no,
-          years_experience,
-          gender,
-          fees_min,
-          fees_max,
-          bio,
-          languages,
-          rating,
-          interested_field as interesterd_field,
-          educational_info,
-          image
-        FROM therapists
-        ORDER BY rating DESC, years_experience DESC
-      `);
+      // First, let's check if the specialties table has data
+      const [specialties] = await connection.execute('SELECT * FROM specialties');
+      console.log('Specialties in database:', specialties);
 
-      return NextResponse.json({
-        therapists: therapists || []
-      });
+      // Then check therapists table
+      const [therapists] = await connection.execute('SELECT * FROM therapists');
+      console.log('Therapists in database:', therapists);
+
+      // Check therapist_specialties table
+      const [specialtyMappings] = await connection.execute('SELECT * FROM therapist_specialties');
+      console.log('Specialty mappings in database:', specialtyMappings);
+
+      // Now do our main query with a simpler structure first
+      const query = `
+        SELECT 
+          t.*, 
+          ts.specialty_id
+        FROM therapists t
+        LEFT JOIN therapist_specialties ts ON t.therapist_id = ts.therapist_id
+      `;
+      
+      console.log('Executing query:', query);
+      const [rows] = await connection.execute(query);
+      console.log('Query results:', rows);
+      console.log('API: Query executed, rows:', rows);
+      return NextResponse.json(rows);
     } finally {
       connection.release();
     }
