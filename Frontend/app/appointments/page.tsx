@@ -1,608 +1,590 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Calendar, Clock, User, Mail, Phone, MessageSquare, Filter, Search, Star, Award, MapPin } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth, RequireAuth } from "@/lib/auth-context";
+import dayjs from "dayjs";
+import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
+import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
+dayjs.extend(isSameOrBefore);
+dayjs.extend(isSameOrAfter);
+
+import {
+  Calendar,
+  Clock,
+  ChevronRight,
+  Phone,
+  SlidersHorizontal,
+  Star,
+  Search,
+} from "lucide-react";
 import { toast } from "sonner";
 
-interface Specialty {
-  specialty_id: number;
-  name: string;
-  description: string;
-}
-
-interface Therapist {
+type Specialty = { specialty_id: number; name: string };
+type Therapist = {
   therapist_id: number;
   name: string;
   email: string;
-  license_no: string;
-  years_experience: number;
-  gender: string;
-  fees_min: number;
-  fees_max: number;
-  bio: string;
-  languages: string;
-  rating: number;
-  interesterd_field: string;
-  educational_info: string;
-  image: string;
-  specialties?: Specialty[];
-}
+  qualifications: string;
+  specialty_id: number | null;
+  education: string | null;
+  experience: string | null;
+  license_no: string | null;
+  years_experience: number | null;
+  gender: string | null;
+  fees_min: number | null;
+  fees_max: number | null;
+  languages: string | null;
+  rating: number | null;
+  image: string | null;
+};
+type Slot = { start: string; end: string };
 
-interface User {
-  user_id: number;
-  name: string;
-  email: string;
-  phone: string;
-}
+function AppointmentPageContent() {
+  const router = useRouter();
+  const { user } = useAuth();
 
-export default function AppointmentsPage() {
-  const [therapists, setTherapists] = useState<Therapist[]>([]);
+  // tabs
   const [specialties, setSpecialties] = useState<Specialty[]>([]);
+  const [activeSpec, setActiveSpec] = useState<number | null>(null);
+
+  // data
+  const [allTherapists, setAllTherapists] = useState<Therapist[]>([]);
+  const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [selectedTherapist, setSelectedTherapist] = useState<Therapist | null>(null);
-  const [showBookingForm, setShowBookingForm] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  
-  // Mock user data - in real app, get from auth context
-  const [currentUser] = useState<User>({
-    user_id: 1,
-    name: "John Doe",
-    email: "john@example.com",
-    phone: "+8801234567890"
-  });
-  
-  // Form fields matching your schema
-  const [selectedDate, setSelectedDate] = useState("");
-  const [startTime, setStartTime] = useState("");
-  const [sessionDuration, setSessionDuration] = useState(60); // minutes
-  const [appointmentStatus] = useState<"pending" | "scheduled" | "cancelled" | "completed">("pending");
 
-  // Filter state
-  const [filterSpecialty, setFilterSpecialty] = useState("");
-  const [filterGender, setFilterGender] = useState("");
-  const [filterExperience, setFilterExperience] = useState("");
-  const [filterRating, setFilterRating] = useState("");
-  const [priceRange, setPriceRange] = useState({ min: 0, max: 10000 });
+  // booking
+  const [date, setDate] = useState(dayjs().add(1, "day").format("YYYY-MM-DD"));
+  const [slots, setSlots] = useState<Slot[]>([]);
+  const [pickedSlot, setPickedSlot] = useState<Slot | null>(null);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [isBooking, setIsBooking] = useState(false);
+  const [bookedSlots, setBookedSlots] = useState<Set<string>>(new Set());
+  const [blockedSlotStart, setBlockedSlotStart] = useState<string | null>(null);
 
+  // filters
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [gender, setGender] = useState<"" | "Male" | "Female" | "Other">("");
+  const [minRating, setMinRating] = useState<number>(0);
+  const [feeMin, setFeeMin] = useState<number>(0);
+  const [feeMax, setFeeMax] = useState<number>(5000);
+  const [sortBy, setSortBy] = useState<"rating" | "feeAsc" | "feeDesc" | "experience">("rating");
+
+  // init
   useEffect(() => {
-    fetchTherapists();
-    fetchSpecialties();
+    setSpecialties([
+      { specialty_id: 1, name: "Psychologist" },
+      { specialty_id: 2, name: "Psychiatrist" },
+    ]);
+    setActiveSpec(2);
   }, []);
 
-  const fetchTherapists = async () => {
-    try {
-      const response = await fetch('/api/therapists-with-specialties');
-      const data = await response.json();
-      if (response.ok) {
-        setTherapists(data.therapists || []);
-      } else {
-        // Fallback to existing therapists API
-        const fallbackResponse = await fetch('/api/therapists');
-        const fallbackData = await fallbackResponse.json();
-        if (fallbackResponse.ok) {
-          setTherapists(fallbackData.therapists || []);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching therapists:', error);
-      toast.error('Failed to load therapists');
+  useEffect(() => {
+    fetch("/api/therapists")
+      .then(r => r.json())
+      .then((data: Therapist[]) => (Array.isArray(data) ? setAllTherapists(data) : setAllTherapists([])))
+      .catch(() => setAllTherapists([]));
+  }, []);
+
+  useEffect(() => {
+    if (!allTherapists.length) return;
+    const mins = allTherapists.map(t => t.fees_min ?? 0);
+    const maxs = allTherapists.map(t => t.fees_max ?? 0);
+    setFeeMin(Math.min(...mins.filter(n => n > 0), 500) || 500);
+    setFeeMax(Math.max(...maxs, 2000) || 2000);
+  }, [allTherapists]);
+
+  useEffect(() => {
+    const next = allTherapists.filter(t => {
+      if (activeSpec === 1) return !t.license_no; // Psychologist
+      if (activeSpec === 2) return !!t.license_no; // Psychiatrist
+      return true;
+    });
+    setTherapists(next);
+    setSelectedTherapist(null);
+    setPickedSlot(null);
+  }, [activeSpec, allTherapists]);
+
+  // Function to refresh slots
+  const refreshSlots = useCallback(() => {
+    if (!selectedTherapist || !date) return;
+    setSlotsLoading(true);
+    fetch(`/api/slots?therapist_id=${selectedTherapist.therapist_id}&date=${date}`)
+      .then(r => r.json())
+      .then((data: Slot[]) => {
+        const newSlots = Array.isArray(data) ? data : [];
+        setSlots(newSlots);
+      })
+      .catch(() => setSlots([]))
+      .finally(() => setSlotsLoading(false));
+  }, [selectedTherapist, date]);
+
+  // Separate effect to check if selected slot is still available
+  // TEMPORARILY DISABLED - causing selection issues
+  // useEffect(() => {
+  //   if (pickedSlot && slots.length > 0) {
+  //     const isSlotStillAvailable = slots.some(slot => slot.start === pickedSlot.start);
+  //     if (!isSlotStillAvailable) {
+  //       setPickedSlot(null);
+  //       toast.warning("Your selected time slot is no longer available. Please select another slot.");
+  //     }
+  //   }
+  // }, [slots, pickedSlot]);
+
+  useEffect(() => {
+    if (!selectedTherapist || !date) return;
+    setPickedSlot(null);
+    refreshSlots();
+  }, [selectedTherapist, date, refreshSlots]);
+
+  // Real-time slot updates - refresh every 30 seconds when therapist and date are selected
+  // TEMPORARILY DISABLED - causing selection issues
+  // useEffect(() => {
+  //   if (!selectedTherapist || !date) return;
+    
+  //   const interval = setInterval(() => {
+  //     refreshSlots();
+  //   }, 30000); // 30 seconds
+
+  //   return () => clearInterval(interval);
+  // }, [selectedTherapist, date, refreshSlots]);
+
+  const headerTitle = useMemo(() => {
+    const s = specialties.find(x => x.specialty_id === activeSpec)?.name ?? "Appointment";
+    return `Book a ${s}`;
+  }, [specialties, activeSpec]);
+
+  const filteredTherapists = useMemo(() => {
+    let list = [...therapists];
+    
+    // Search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      list = list.filter(t => 
+        t.name.toLowerCase().includes(query) ||
+        (t.qualifications || "").toLowerCase().includes(query) ||
+        (t.languages || "").toLowerCase().includes(query) ||
+        (t.education || "").toLowerCase().includes(query)
+      );
     }
-  };
-
-  const fetchSpecialties = async () => {
-    try {
-      const response = await fetch('/api/specialties');
-      const data = await response.json();
-      if (response.ok) {
-        setSpecialties(data.specialties || []);
-      }
-    } catch (error) {
-      console.error('Error fetching specialties:', error);
-      // Continue without specialties filter
+    
+    if (gender) list = list.filter(t => (t.gender || "").toLowerCase() === gender.toLowerCase());
+    if (minRating > 0) list = list.filter(t => (t.rating ?? 0) >= minRating);
+    list = list.filter(t => {
+      const fmin = t.fees_min ?? 0;
+      const fmax = t.fees_max ?? fmin;
+      return fmax >= feeMin && fmin <= feeMax;
+    });
+    switch (sortBy) {
+      case "feeAsc": list.sort((a, b) => (a.fees_min ?? 0) - (b.fees_min ?? 0)); break;
+      case "feeDesc": list.sort((a, b) => (b.fees_min ?? 0) - (a.fees_min ?? 0)); break;
+      case "experience": list.sort((a, b) => (b.years_experience ?? 0) - (a.years_experience ?? 0)); break;
+      default: list.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
     }
-  };
+    return list;
+  }, [therapists, searchQuery, gender, minRating, feeMin, feeMax, sortBy]);
 
-  const calculateEndTime = (startDateTime: string, durationMin: number): string => {
-    const start = new Date(startDateTime);
-    const end = new Date(start.getTime() + durationMin * 60000);
-    return end.toISOString().slice(0, 19).replace('T', ' ');
-  };
-
-  const handleBookAppointment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedTherapist || !selectedDate || !startTime) {
-      toast.error('Please fill in all required fields');
+  // ====== IMPORTANT: force-redirect bookNow ======
+  async function bookNow() {
+    if (!selectedTherapist || !pickedSlot || isBooking) {
+      if (isBooking) return; // Prevent double-clicks
+      toast.warning("Please select a therapist and time slot");
       return;
     }
 
-    const startDateTime = `${selectedDate} ${startTime}:00`;
-    const endDateTime = calculateEndTime(startDateTime, sessionDuration);
+    // Store the current picked slot
+    const bookedSlot = pickedSlot;
+    
+    // IMMEDIATELY mark this slot as blocked to make it unselectable
+    setBookedSlots(prev => new Set([...prev, bookedSlot.start]));
+    setBlockedSlotStart(bookedSlot.start);
+    
+    setIsBooking(true);
 
-    const appointmentData = {
-      user_id: currentUser.user_id,
-      therapist_id: selectedTherapist.therapist_id,
-      start_time: startDateTime,
-      end_time: endDateTime,
-      status: appointmentStatus
-    };
-
-    setLoading(true);
     try {
-      const response = await fetch('/api/appointments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(appointmentData)
+      // 1) appointment
+      const r1 = await fetch("/api/appointments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: user?.user_id || user?.therapist_id,
+          therapist_id: selectedTherapist.therapist_id,
+          start_time: bookedSlot.start,
+          end_time: bookedSlot.end,
+        }),
       });
-
-      const data = await response.json();
-      if (response.ok) {
-        toast.success('Appointment booked successfully!');
-        resetForm();
-      } else {
-        toast.error(data.error || 'Failed to book appointment');
+      const j1 = await r1.json();
+      
+      console.log('Appointment response:', j1); // Debug log
+      console.log('Response status:', r1.status, 'OK:', r1.ok);
+      console.log('JSON ok field:', j1.ok, 'appointment_id:', j1.appointment_id, 'type:', typeof j1.appointment_id);
+      
+      if (!r1.ok) {
+        console.log('HTTP request failed');
+        throw new Error(j1.message || `Appointment failed (${r1.status})`);
       }
-    } catch (error) {
-      console.error('Error booking appointment:', error);
-      toast.error('Failed to book appointment');
-    } finally {
-      setLoading(false);
+      
+      if (!j1.ok) {
+        console.log('API response indicates failure');
+        throw new Error(j1.message || 'Failed to create appointment');
+      }
+      
+      if (typeof j1.appointment_id !== 'number' || j1.appointment_id < 0) {
+        console.log('Invalid appointment ID in response:', j1.appointment_id);
+        throw new Error('Failed to get valid appointment ID');
+      }
+      
+      console.log('Appointment created successfully with ID:', j1.appointment_id);
+
+      // Show success notification
+      toast.success("Appointment booked successfully! Redirecting to payment...");
+
+      // Refresh slots to get the latest state from server
+      refreshSlots();
+
+      // 2) payment intent
+      const r2 = await fetch("/api/payments/intent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ appointment_id: j1.appointment_id, user_id: user?.user_id || user?.therapist_id }),
+      });
+      const j2 = await r2.json();
+      
+      console.log('Payment response:', j2); // Debug log
+      
+      if (!r2.ok) {
+        throw new Error(j2.message || `Payment init failed (${r2.status})`);
+      }
+      
+      if (!j2.ok || !j2.payment_id) {
+        throw new Error(j2.message || 'Failed to get payment ID');
+      }
+
+      // 3) redirect URL
+      const target = `/pay/${j1.appointment_id}?pid=${j2.payment_id}`;
+      const abs = new URL(target, window.location.origin).toString();
+      console.log("[BOOK] redirect:", abs);
+
+      // try router first
+      try { router.push(target); } catch {}
+      // force fallback (যেকোনো পরিস্থিতিতে নেবে)
+      setTimeout(() => {
+        if (window.location.href !== abs) window.location.assign(abs);
+      }, 60);
+    } catch (err: any) {
+      console.error(err);
+      // Restore the slot if booking failed
+      setBookedSlots(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(bookedSlot.start);
+        return newSet;
+      });
+      setBlockedSlotStart(null);
+      setPickedSlot(bookedSlot);
+      setIsBooking(false);
+      toast.error(err?.message || "Could not complete booking. Please try again.");
     }
-  };
-
-  const resetForm = () => {
-    setSelectedTherapist(null);
-    setShowBookingForm(false);
-    setSelectedDate("");
-    setStartTime("");
-    setSessionDuration(60);
-  };
-
-  const filteredTherapists = therapists.filter(therapist => {
-    const matchesSearch = therapist.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         therapist.interesterd_field?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         therapist.bio?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         therapist.educational_info?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesSpecialty = !filterSpecialty || 
-                            therapist.specialties?.some(s => s.name.toLowerCase().includes(filterSpecialty.toLowerCase())) ||
-                            therapist.interesterd_field?.toLowerCase().includes(filterSpecialty.toLowerCase());
-    
-    const matchesGender = !filterGender || therapist.gender?.toLowerCase() === filterGender.toLowerCase();
-    
-    const matchesExperience = !filterExperience || (therapist.years_experience || 0) >= parseInt(filterExperience);
-    
-    const matchesRating = !filterRating || (therapist.rating || 0) >= parseFloat(filterRating);
-    
-    const matchesPrice = (!therapist.fees_min || therapist.fees_min >= priceRange.min) && 
-                        (!therapist.fees_max || therapist.fees_max <= priceRange.max);
-    
-    return matchesSearch && matchesSpecialty && matchesGender && matchesExperience && matchesRating && matchesPrice;
-  });
-
-  const timeSlots = [
-    "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30",
-    "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00"
-  ];
-
-  const durationOptions = [30, 45, 60, 90, 120];
-
-  // Get today's date for minimum date selection
-  const today = new Date().toISOString().split('T')[0];
+    // Note: we don't reset isBooking on success since we're redirecting
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#2596be]/10 via-sky-50 to-indigo-50 p-4">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-[#2596be] mb-2">সই — Book an Appointment</h1>
-          <p className="text-gray-600">Find and book appointments with qualified mental health professionals</p>
+    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      {/* Hero */}
+      <div className="relative mb-10 overflow-hidden rounded-3xl border border-white/20 bg-gradient-modern">
+        <div className="relative z-10 grid items-center gap-6 p-8 lg:p-10 md:grid-cols-2">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-bold text-[#1f6d89]">{headerTitle}</h1>
+            <p className="mt-2 text-gray-700">Pick your specialist, choose a time, and confirm. It's that simple.</p>
+            <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
+              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/90 backdrop-blur border">
+                <Calendar className="w-4 h-4" /> Flexible online sessions
+              </span>
+              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/90 backdrop-blur border">
+                <Phone className="w-4 h-4" /> Helpline: 01xxxxxxxxx
+              </span>
+            </div>
+          </div>
+          <div className="relative mx-auto md:mx-0 w-full max-w-[520px]">
+            <div className="absolute -right-10 -top-10 h-56 w-56 rounded-full bg-[#2596be]/25 blur-3xl" />
+            <div className="absolute -left-10 bottom-0 h-40 w-40 rounded-full bg-[#1f6d89]/15 blur-3xl" />
+            <div className="absolute inset-0 rounded-[28px] bg-gradient-to-br from-[#2596be]/30 via-transparent to-transparent blur-[20px]" />
+            <div className="relative z-10 rounded-[28px] border border-white/70 bg-white/80 backdrop-blur shadow-2xl">
+              <div className="p-2 sm:p-3">
+                <img src="/Appointment.jpg" alt="Easy appointment booking" className="block w-full rounded-[22px] object-cover" />
+              </div>
+            </div>
+          </div>
         </div>
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/5 to-transparent" />
+      </div>
 
-        {!showBookingForm ? (
-          <>
-            {/* Advanced Search and Filter Section */}
-            <Card className="p-6 mb-6">
-              <h3 className="text-lg font-semibold mb-4">Find Your Perfect Therapist</h3>
-              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                <div className="relative">
-                  <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
-                  <Input
-                    className="pl-9"
-                    placeholder="Search by name, specialty, or education..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-                
-                <select
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2596be]"
-                  value={filterSpecialty}
-                  onChange={(e) => setFilterSpecialty(e.target.value)}
+      {/* Tabs */}
+      <div className="mb-4 flex gap-2 flex-wrap">
+        {specialties.map(s => (
+          <button
+            key={s.specialty_id}
+            onClick={() => setActiveSpec(s.specialty_id)}
+            className={`px-4 py-2 rounded-full border transition-all ${
+              activeSpec === s.specialty_id ? "bg-[#2596be] text-white border-[#2596be]" : "bg-white text-[#2596be] border-[#2596be]"
+            }`}
+          >
+            {s.name}
+          </button>
+        ))}
+      </div>
+
+      {/* Search */}
+      <div className="mb-6 card-modern border-0 p-4">
+        <div className="flex items-center gap-2 text-primary font-semibold mb-3">
+          <Search className="w-5 h-5" /> Search Therapists
+        </div>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search by name, qualifications, languages, or education..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-3 input-modern"
+          />
+        </div>
+        {searchQuery && (
+          <div className="mt-2 text-sm text-gray-600">
+            Found {filteredTherapists.length} therapist{filteredTherapists.length !== 1 ? 's' : ''} matching "{searchQuery}"
+          </div>
+        )}
+        {!searchQuery && (
+          <div className="mt-3">
+            <p className="text-sm text-gray-600 mb-2">Quick search:</p>
+            <div className="flex flex-wrap gap-2">
+              {["Psychology", "Psychiatry", "Anxiety", "Depression", "Counseling", "English", "Bengali", "Female", "Male"].map((tag) => (
+                <button
+                  key={tag}
+                  onClick={() => setSearchQuery(tag)}
+                  className="px-3 py-1 text-xs rounded-full bg-gray-100 text-gray-700 hover:bg-[#2596be] hover:text-white transition-colors"
                 >
-                  <option value="">All Specialties</option>
-                  {specialties.map(specialty => (
-                    <option key={specialty.specialty_id} value={specialty.name}>
-                      {specialty.name}
-                    </option>
-                  ))}
-                  <option value="anxiety">Anxiety</option>
-                  <option value="depression">Depression</option>
-                  <option value="stress">Stress Management</option>
-                  <option value="relationship">Relationship Counseling</option>
-                </select>
-
-                <select
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2596be]"
-                  value={filterGender}
-                  onChange={(e) => setFilterGender(e.target.value)}
-                >
-                  <option value="">Any Gender</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="other">Other</option>
-                </select>
-
-                <select
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2596be]"
-                  value={filterExperience}
-                  onChange={(e) => setFilterExperience(e.target.value)}
-                >
-                  <option value="">Any Experience</option>
-                  <option value="1">1+ Years</option>
-                  <option value="3">3+ Years</option>
-                  <option value="5">5+ Years</option>
-                  <option value="10">10+ Years</option>
-                </select>
-              </div>
-
-              <div className="grid md:grid-cols-3 gap-4">
-                <select
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2596be]"
-                  value={filterRating}
-                  onChange={(e) => setFilterRating(e.target.value)}
-                >
-                  <option value="">Any Rating</option>
-                  <option value="4.5">4.5+ Stars</option>
-                  <option value="4">4+ Stars</option>
-                  <option value="3">3+ Stars</option>
-                </select>
-
-                <div className="flex items-center gap-2">
-                  <label className="text-sm">Price Range:</label>
-                  <Input
-                    type="number"
-                    placeholder="Min"
-                    value={priceRange.min}
-                    onChange={(e) => setPriceRange({...priceRange, min: parseInt(e.target.value) || 0})}
-                    className="w-20"
-                  />
-                  <span>-</span>
-                  <Input
-                    type="number"
-                    placeholder="Max"
-                    value={priceRange.max}
-                    onChange={(e) => setPriceRange({...priceRange, max: parseInt(e.target.value) || 10000})}
-                    className="w-20"
-                  />
-                </div>
-
-                <Button 
-                  onClick={() => {
-                    setSearchTerm("");
-                    setFilterSpecialty("");
-                    setFilterGender("");
-                    setFilterExperience("");
-                    setFilterRating("");
-                    setPriceRange({ min: 0, max: 10000 });
-                  }}
-                  variant="outline"
-                  className="border-[#2596be] text-[#2596be]"
-                >
-                  <Filter className="w-4 h-4 mr-2" />
-                  Clear All
-                </Button>
-              </div>
-            </Card>
-
-            {/* Therapists Grid */}
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredTherapists.map((therapist) => (
-                <Card key={therapist.therapist_id} className="p-6 hover:shadow-lg transition-shadow">
-                  <div className="flex items-start gap-4 mb-4">
-                    <div className="w-16 h-16 bg-[#2596be]/10 rounded-full flex items-center justify-center overflow-hidden">
-                      {therapist.image ? (
-                        <img src={therapist.image} alt={therapist.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <User className="w-8 h-8 text-[#2596be]" />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-lg">{therapist.name}</h3>
-                      <p className="text-sm text-gray-600">{therapist.educational_info}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <div className="flex items-center gap-1">
-                          <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                          <span className="text-sm">{Number(therapist.rating || 0).toFixed(1) || 'New'}</span>
-                        </div>
-                        {therapist.gender && (
-                          <span className="text-xs bg-gray-100 px-2 py-1 rounded-full">
-                            {therapist.gender}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="mb-3">
-                    <p className="text-sm text-gray-600 mb-2">
-                      <Award className="w-4 h-4 inline mr-1" />
-                      <strong>Experience:</strong> {therapist.years_experience || 0} years
-                    </p>
-                    {therapist.license_no && (
-                      <p className="text-xs text-gray-500">License: {therapist.license_no}</p>
-                    )}
-                  </div>
-
-                  {/* Specialties */}
-                  {therapist.specialties && therapist.specialties.length > 0 && (
-                    <div className="mb-3">
-                      <div className="flex flex-wrap gap-1">
-                        {therapist.specialties.slice(0, 3).map(specialty => (
-                          <span key={specialty.specialty_id} className="text-xs bg-[#2596be]/10 text-[#2596be] px-2 py-1 rounded-full">
-                            {specialty.name}
-                          </span>
-                        ))}
-                        {therapist.specialties.length > 3 && (
-                          <span className="text-xs bg-gray-100 px-2 py-1 rounded-full">
-                            +{therapist.specialties.length - 3} more
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Interested Field */}
-                  {therapist.interesterd_field && (
-                    <div className="mb-3">
-                      <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
-                        Focus: {therapist.interesterd_field}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Languages */}
-                  {therapist.languages && (
-                    <div className="mb-3">
-                      <p className="text-sm text-gray-600">
-                        <strong>Languages:</strong> {therapist.languages}
-                      </p>
-                    </div>
-                  )}
-
-                  {therapist.bio && (
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">{therapist.bio}</p>
-                  )}
-
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="text-sm">
-                      <span className="font-medium">Session Fee: </span>
-                      <span className="text-[#2596be] font-semibold">
-                        ৳{therapist.fees_min || 1000} - ৳{therapist.fees_max || 3000}
-                      </span>
-                    </div>
-                  </div>
-
-                  <Button 
-                    onClick={() => {
-                      setSelectedTherapist(therapist);
-                      setShowBookingForm(true);
-                    }}
-                    className="w-full bg-[#2596be] hover:bg-[#1d7a99] text-white"
-                  >
-                    <Calendar className="w-4 h-4 mr-2" />
-                    Book Appointment
-                  </Button>
-                </Card>
+                  {tag}
+                </button>
               ))}
             </div>
-
-            {filteredTherapists.length === 0 && (
-              <Card className="p-8 text-center">
-                <p className="text-gray-500">No therapists found matching your criteria.</p>
-                <p className="text-sm text-gray-400 mt-2">Try adjusting your filters or search terms.</p>
-              </Card>
-            )}
-          </>
-        ) : (
-          /* Booking Form */
-          <Card className="max-w-3xl mx-auto p-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-[#2596be]">Schedule Your Session</h2>
-              <Button 
-                variant="outline" 
-                onClick={resetForm}
-                className="border-gray-300"
-              >
-                ← Back to Therapists
-              </Button>
-            </div>
-
-            {/* Current User Info */}
-            <div className="bg-blue-50 rounded-lg p-4 mb-6">
-              <h4 className="font-medium mb-2">Booking for:</h4>
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-[#2596be]/10 rounded-full flex items-center justify-center">
-                  <User className="w-5 h-5 text-[#2596be]" />
-                </div>
-                <div>
-                  <p className="font-medium">{currentUser.name}</p>
-                  <p className="text-sm text-gray-600">{currentUser.email}</p>
-                  <p className="text-sm text-gray-600">{currentUser.phone}</p>
-                </div>
-              </div>
-            </div>
-
-            {selectedTherapist && (
-              <div className="bg-gradient-to-r from-[#2596be]/5 to-sky-50 rounded-lg p-6 mb-6">
-                <h4 className="font-medium mb-3">Selected Therapist:</h4>
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 bg-[#2596be]/10 rounded-full flex items-center justify-center overflow-hidden">
-                    {selectedTherapist.image ? (
-                      <img src={selectedTherapist.image} alt={selectedTherapist.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <User className="w-8 h-8 text-[#2596be]" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-lg">{selectedTherapist.name}</h3>
-                    <p className="text-sm text-gray-600">{selectedTherapist.educational_info}</p>
-                    <div className="flex items-center gap-4 mt-2">
-                      <div className="flex items-center gap-1">
-                        <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                        <span className="text-sm">{Number(selectedTherapist.rating || 0).toFixed(1) || 'New'}</span>
-                      </div>
-                      <span className="text-sm text-[#2596be] font-medium">
-                        ৳{selectedTherapist.fees_min || 1000} - ৳{selectedTherapist.fees_max || 3000} per session
-                      </span>
-                      <span className="text-sm text-gray-500">
-                        {selectedTherapist.years_experience || 0} years exp.
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <form onSubmit={handleBookAppointment} className="space-y-6">
-              <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    <Calendar className="w-4 h-4 inline mr-2" />
-                    Appointment Date *
-                  </label>
-                  <Input
-                    type="date"
-                    required
-                    min={today}
-                    value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
-                    className="w-full"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    <Clock className="w-4 h-4 inline mr-2" />
-                    Start Time *
-                  </label>
-                  <select
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2596be]"
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
-                  >
-                    <option value="">Select start time</option>
-                    {timeSlots.map(time => (
-                      <option key={time} value={time}>{time}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Session Duration *</label>
-                  <select
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2596be]"
-                    value={sessionDuration}
-                    onChange={(e) => setSessionDuration(parseInt(e.target.value))}
-                  >
-                    {durationOptions.map(duration => (
-                      <option key={duration} value={duration}>
-                        {duration} minutes
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {selectedDate && startTime && (
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Session End Time</label>
-                    <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-gray-600">
-                      {(() => {
-                        const start = new Date(`${selectedDate} ${startTime}`);
-                        const end = new Date(start.getTime() + sessionDuration * 60000);
-                        return end.toTimeString().slice(0, 5);
-                      })()}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Session Cost Calculation */}
-              {selectedTherapist && sessionDuration && (
-                <div className="bg-[#2596be]/5 rounded-lg p-4">
-                  <h4 className="font-medium mb-2">Session Details</h4>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-600">Duration:</span>
-                      <span className="ml-2 font-medium">{sessionDuration} minutes</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Fee Range:</span>
-                      <span className="ml-2 font-semibold text-[#2596be]">
-                        ৳{selectedTherapist.fees_min || 1000} - ৳{selectedTherapist.fees_max || 3000}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Status:</span>
-                      <span className="ml-2 font-medium text-orange-600">Pending Confirmation</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Therapist ID:</span>
-                      <span className="ml-2 font-medium">{selectedTherapist.therapist_id}</span>
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    Final fee will be confirmed by the therapist before the session
-                  </p>
-                </div>
-              )}
-
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <h4 className="font-medium text-yellow-800 mb-2">Booking Information</h4>
-                <ul className="text-sm text-yellow-700 space-y-1">
-                  <li>• Your appointment will be marked as "Pending" until confirmed by the therapist</li>
-                  <li>• You will receive a confirmation email once the therapist approves your request</li>
-                  <li>• Please arrive 5-10 minutes early for your session</li>
-                  <li>• You can reschedule or cancel up to 24 hours before your appointment</li>
-                </ul>
-              </div>
-
-              <Button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-[#2596be] hover:bg-[#1d7a99] text-white py-3 text-lg"
-              >
-                {loading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                    Booking Your Session...
-                  </>
-                ) : (
-                  <>
-                    <Calendar className="w-5 h-5 mr-2" />
-                    Confirm Appointment Booking
-                  </>
-                )}
-              </Button>
-            </form>
-          </Card>
+          </div>
         )}
       </div>
-    </div>
+
+      {/* Filters */}
+      <div className="mb-8 rounded-2xl border bg-white p-4 shadow-sm">
+        <div className="flex items-center gap-2 text-[#1f6d89] font-semibold mb-3">
+          <SlidersHorizontal className="w-5 h-5" /> Filters
+        </div>
+        <div className="grid md:grid-cols-4 gap-4">
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">Gender</label>
+            <select value={gender} onChange={e => setGender(e.target.value as any)} className="w-full rounded-xl border px-3 py-2">
+              <option value="">Any</option><option>Male</option><option>Female</option><option>Other</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">Min rating</label>
+            <div className="flex items-center gap-2">
+              <input type="range" min={0} max={5} step={0.5} value={minRating} onChange={e => setMinRating(Number(e.target.value))} className="w-full" />
+              <div className="w-12 text-sm font-medium flex items-center gap-1"><Star className="w-4 h-4" /> {minRating.toFixed(1)}</div>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">Min fee (BDT)</label>
+            <input type="number" value={feeMin} onChange={e => setFeeMin(Number(e.target.value))} className="w-full rounded-xl border px-3 py-2" />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">Max fee (BDT)</label>
+            <input type="number" value={feeMax} onChange={e => setFeeMax(Number(e.target.value))} className="w-full rounded-xl border px-3 py-2" />
+          </div>
+        </div>
+
+        <div className="mt-4 grid md:grid-cols-4 gap-4">
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">Sort by</label>
+            <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} className="w-full rounded-xl border px-3 py-2">
+              <option value="rating">Rating (high → low)</option>
+              <option value="feeAsc">Fee (low → high)</option>
+              <option value="feeDesc">Fee (high → low)</option>
+              <option value="experience">Experience (high → low)</option>
+            </select>
+          </div>
+          <div className="flex items-end">
+            <button
+              onClick={() => {
+                setSearchQuery("");
+                setGender(""); setMinRating(0);
+                const mins = therapists.map(t => t.fees_min ?? 0);
+                const maxs = therapists.map(t => t.fees_max ?? 0);
+                setFeeMin(Math.min(...mins.filter(n => n > 0), 500) || 500);
+                setFeeMax(Math.max(...maxs, 2000) || 2000);
+                setSortBy("rating");
+              }}
+              className="rounded-xl border px-4 py-2 text-[#2596be] border-[#2596be]"
+            >
+              Reset filters
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="grid lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 grid md:grid-cols-2 gap-6">
+          {filteredTherapists.map(t => (
+            <div
+              key={t.therapist_id}
+              className={`rounded-3xl border bg-white p-5 shadow-sm hover:shadow-lg transition ${selectedTherapist?.therapist_id === t.therapist_id ? "ring-2 ring-[#2596be]" : ""}`}
+            >
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-semibold text-[#1f6d89]">{t.name}</h3>
+                    <span className="text-sm text-gray-500">⭐ {t.rating ?? "—"}</span>
+                  </div>
+                  {t.license_no && <p className="text-xs text-green-600 font-medium mt-1">license_no: {t.license_no}</p>}
+                  {t.education && <p className="text-sm text-gray-700 mt-1">{t.education}</p>}
+                  <p className="text-sm text-gray-600">
+                    {t.experience ? `${t.experience} • ` : ""}{t.gender ?? "—"} • {t.languages ?? "—"}
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-[#2596be]">
+                    Fee: {t.fees_min ?? "—"}–{t.fees_max ?? "—"} BDT
+                  </p>
+                  <button onClick={() => setSelectedTherapist(t)} className="mt-3 inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-[#2596be] text-white hover:bg-[#1d7a99]">
+                    Select <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+          {!filteredTherapists.length && (
+            <div className="col-span-2 text-center py-12">
+              <div className="text-gray-400 mb-4">
+                <Search className="w-16 h-16 mx-auto mb-2" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No therapists found</h3>
+              <p className="text-gray-600 mb-4">
+                {searchQuery ? `No therapists match your search for "${searchQuery}"` : "No therapists match your current filters."}
+              </p>
+              <button
+                onClick={() => {
+                  setSearchQuery("");
+                  setGender(""); 
+                  setMinRating(0);
+                  const mins = therapists.map(t => t.fees_min ?? 0);
+                  const maxs = therapists.map(t => t.fees_max ?? 0);
+                  setFeeMin(Math.min(...mins.filter(n => n > 0), 500) || 500);
+                  setFeeMax(Math.max(...maxs, 2000) || 2000);
+                  setSortBy("rating");
+                }}
+                className="inline-flex items-center px-4 py-2 rounded-xl bg-[#2596be] text-white hover:bg-[#1d7a99] transition-colors"
+              >
+                Clear all filters
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* booking panel */}
+        <aside className="lg:col-span-1">
+          <div className="sticky top-6 rounded-3xl border bg-white p-6 shadow-sm">
+            <h4 className="text-lg font-semibold text-[#1f6d89]">Your booking</h4>
+
+            <div className="mt-4 space-y-4 text-sm">
+              <div><div className="text-gray-500">Specialty</div><div className="font-medium">{specialties.find(s => s.specialty_id === activeSpec)?.name ?? "—"}</div></div>
+              <div><div className="text-gray-500">Therapist</div><div className="font-medium">{selectedTherapist?.name ?? "Select a therapist"}</div></div>
+              <div>
+                <label className="text-gray-500 block mb-1">Date</label>
+                <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full rounded-xl border px-3 py-2" min={dayjs().format("YYYY-MM-DD")} />
+              </div>
+              <div>
+                <div className="text-gray-500 mb-2">Available Time</div>
+                {slotsLoading ? (
+                  <div className="text-center py-4 text-gray-500">
+                    <div className="animate-spin w-6 h-6 border-2 border-[#2596be] border-t-transparent rounded-full mx-auto mb-2"></div>
+                    Loading available slots...
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {slots.map(s => {
+                      const isBooked = bookedSlots.has(s.start) || blockedSlotStart === s.start;
+                      const isSelected = pickedSlot?.start === s.start;
+                      
+                      return (
+                        <button
+                          key={s.start}
+                          onClick={() => {
+                            if (isBooked) return; // Don't allow selecting booked slots
+                            console.log('Slot clicked:', s.start);
+                            setPickedSlot(s);
+                          }}
+                          disabled={slotsLoading || isBooking || isBooked}
+                          className={`text-sm px-3 py-2 rounded-xl border flex items-center gap-2 transition-colors ${
+                            isSelected && isBooked
+                              ? "bg-[#2596be]/50 text-white/70 border-[#2596be]/50 cursor-not-allowed opacity-60 blur-sm"
+                              : isSelected 
+                                ? "bg-[#2596be] text-white border-[#2596be]"
+                                : isBooked
+                                  ? "bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed opacity-60 blur-sm"
+                                  : "bg-white hover:bg-gray-50"
+                          } disabled:opacity-50 disabled:cursor-not-allowed`}
+                        >
+                          <Clock className="w-4 h-4" />
+                          {dayjs(s.start).format("h:mm A")}
+                        </button>
+                      );
+                    })}
+                    {slots.length === 0 && selectedTherapist && !slotsLoading && (
+                      <div className="col-span-2 text-center py-4 text-gray-500">
+                        No available slots for this date
+                      </div>
+                    )}
+                  </div>
+                )}
+                {!selectedTherapist && <p className="text-xs text-gray-500 mt-2">Pick a therapist to see slots.</p>}
+              </div>
+            </div>
+
+            <button 
+              onClick={bookNow} 
+              disabled={!selectedTherapist || !pickedSlot || isBooking} 
+              className="mt-6 w-full rounded-xl bg-[#2596be] text-white py-3 font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {isBooking && (
+                <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
+              )}
+              {isBooking ? "Booking..." : "Confirm & Continue"}
+            </button>
+            <p className="mt-3 text-xs text-gray-500">You'll be redirected to payment on the next step.</p>
+          </div>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+export default function AppointmentPage() {
+  const router = useRouter();
+
+  return (
+    <RequireAuth
+      fallback={
+        <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-[#2596be]/10 via-sky-50 to-indigo-50">
+          <div className="text-center p-8 bg-white rounded-xl shadow-lg max-w-md mx-4">
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Login Required</h1>
+            <p className="text-gray-600 mb-6">You need to be logged in to book appointments.</p>
+            <button
+              onClick={() => router.push('/login')}
+              className="w-full bg-[#2596be] text-white py-3 px-6 rounded-lg font-semibold hover:bg-[#2596be]/90 transition-colors"
+            >
+              Go to Login
+            </button>
+          </div>
+        </div>
+      }
+    >
+      <AppointmentPageContent />
+    </RequireAuth>
   );
 }

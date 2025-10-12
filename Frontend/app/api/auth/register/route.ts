@@ -2,18 +2,14 @@ import { NextResponse } from 'next/server';
 import mysql from 'mysql2/promise';
 
 // Create a connection pool
-const pool = mysql.createPool({
+const dbConfig = {
   host: 'localhost',
-  port: 3306,
   user: 'root',
   password: '',
   database: 'shoi',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-  enableKeepAlive: true,
-  keepAliveInitialDelay: 0
-});
+};
+
+const pool = mysql.createPool(dbConfig);
 
 export async function POST(req: Request) {
   console.log('Starting registration process...');

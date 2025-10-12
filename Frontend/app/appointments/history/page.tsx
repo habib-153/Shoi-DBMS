@@ -1,24 +1,24 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useAuth, RequireAuth } from "@/lib/auth-context";
 import Link from "next/link";
-import { Calendar, Clock, User, Star, MessageCircle, FileText, Download, Filter, Search } from "lucide-react";
+import { Calendar, Clock, User, Star, MessageCircle, FileText, Download, Search } from "lucide-react";
 
 interface Appointment {
   appointment_id: number;
   therapist_name: string;
-  specialty_name: string;
-  appointment_date: string;
   start_time: string;
   end_time: string;
   status: string;
-  session_type: string;
-  notes?: string;
-  rating?: number;
-  cost: number;
+  fees_min: number;
+  fees_max: number;
+  payment_id: number | null;
+  payment_status: string | null;
 }
 
-export default function AppointmentHistory() {
+function AppointmentHistory() {
+  const { user } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [filteredAppointments, setFilteredAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,25 +34,30 @@ export default function AppointmentHistory() {
     filterAppointments();
   }, [appointments, statusFilter, searchTerm, dateRange]);
 
-  const fetchAppointments = async () => {
+  const fetchAppointments = useCallback(async () => {
+    if (!user) return;
+    
     try {
-      const userData = localStorage.getItem('user');
-      if (userData) {
-        const user = JSON.parse(userData);
-        const response = await fetch(`/api/appointments?user_id=${user.user_id}&include_past=true`);
-        if (response.ok) {
-          const data = await response.json();
-          setAppointments(data.appointments || []);
-        }
+      const response = await fetch(`/api/users/${user.user_id || user.therapist_id}/appointments`);
+      if (response.ok) {
+        const data = await response.json();
+        setAppointments(data.appointments || []);
+      } else {
+        console.error('Failed to fetch appointments');
       }
     } catch (error) {
       console.error('Error fetching appointments:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
-  const filterAppointments = () => {
+  const filterAppointments = useCallback(() => {
+    if (!Array.isArray(appointments)) {
+      setFilteredAppointments([]);
+      return;
+    }
+    
     let filtered = [...appointments];
 
     // Filter by status
@@ -63,8 +68,7 @@ export default function AppointmentHistory() {
     // Filter by search term
     if (searchTerm) {
       filtered = filtered.filter(apt =>
-        apt.therapist_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        apt.specialty_name.toLowerCase().includes(searchTerm.toLowerCase())
+        apt.therapist_name.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -89,15 +93,15 @@ export default function AppointmentHistory() {
       }
       
       if (dateRange !== "all") {
-        filtered = filtered.filter(apt => new Date(apt.appointment_date) >= cutoffDate);
+        filtered = filtered.filter(apt => new Date(apt.start_time) >= cutoffDate);
       }
     }
 
     // Sort by date (most recent first)
-    filtered.sort((a, b) => new Date(b.appointment_date).getTime() - new Date(a.appointment_date).getTime());
+    filtered.sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
 
     setFilteredAppointments(filtered);
-  };
+  }, [appointments, statusFilter, searchTerm, dateRange]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -108,8 +112,8 @@ export default function AppointmentHistory() {
     });
   };
 
-  const formatTime = (timeString: string) => {
-    return new Date(`1970-01-01T${timeString}`).toLocaleTimeString('en-US', {
+  const formatTime = (dateTimeString: string) => {
+    return new Date(dateTimeString).toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true
@@ -119,9 +123,8 @@ export default function AppointmentHistory() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed': return 'bg-green-100 text-green-800';
-      case 'scheduled': return 'bg-blue-100 text-blue-800';
-      case 'cancelled': return 'bg-red-100 text-red-800';
-      case 'no-show': return 'bg-gray-100 text-gray-800';
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'paid': return 'bg-blue-100 text-blue-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -186,9 +189,8 @@ export default function AppointmentHistory() {
             >
               <option value="all">All Statuses</option>
               <option value="completed">Completed</option>
-              <option value="scheduled">Scheduled</option>
-              <option value="cancelled">Cancelled</option>
-              <option value="no-show">No Show</option>
+              <option value="pending">Pending</option>
+              <option value="paid">Paid</option>
             </select>
             
             <select
@@ -213,24 +215,24 @@ export default function AppointmentHistory() {
         {/* Summary Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white p-6 rounded-xl shadow-sm border">
-            <div className="text-2xl font-bold text-gray-900">{appointments.length}</div>
+            <div className="text-2xl font-bold text-gray-900">{(appointments || []).length}</div>
             <div className="text-gray-600 text-sm">Total Sessions</div>
           </div>
           <div className="bg-white p-6 rounded-xl shadow-sm border">
             <div className="text-2xl font-bold text-green-600">
-              {appointments.filter(apt => apt.status === 'completed').length}
+              {(appointments || []).filter(apt => apt.status === 'completed').length}
             </div>
             <div className="text-gray-600 text-sm">Completed</div>
           </div>
           <div className="bg-white p-6 rounded-xl shadow-sm border">
             <div className="text-2xl font-bold text-blue-600">
-              {appointments.filter(apt => apt.status === 'scheduled').length}
+              {(appointments || []).filter(apt => apt.status === 'pending' || apt.status === 'paid').length}
             </div>
             <div className="text-gray-600 text-sm">Upcoming</div>
           </div>
           <div className="bg-white p-6 rounded-xl shadow-sm border">
             <div className="text-2xl font-bold text-[#2596be]">
-              ৳{appointments.reduce((total, apt) => total + apt.cost, 0).toLocaleString()}
+              ৳{(appointments || []).reduce((total, apt) => total + (apt.fees_max || apt.fees_min || 0), 0).toLocaleString()}
             </div>
             <div className="text-gray-600 text-sm">Total Spent</div>
           </div>
@@ -253,33 +255,25 @@ export default function AppointmentHistory() {
                           {appointment.status}
                         </span>
                       </div>
-                      <p className="text-gray-600 mb-2">{appointment.specialty_name}</p>
+                      <p className="text-gray-600 mb-2">Therapy Session</p>
                       <div className="flex items-center gap-6 text-sm text-gray-500">
                         <div className="flex items-center gap-1">
                           <Calendar className="w-4 h-4" />
-                          <span>{formatDate(appointment.appointment_date)}</span>
+                          <span>{formatDate(appointment.start_time)}</span>
                         </div>
                         <div className="flex items-center gap-1">
                           <Clock className="w-4 h-4" />
                           <span>{formatTime(appointment.start_time)} - {formatTime(appointment.end_time)}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <span>{getSessionTypeIcon(appointment.session_type)}</span>
-                          <span className="capitalize">{appointment.session_type}</span>
+                          <User className="w-4 h-4" />
+                          <span className="capitalize">Session</span>
                         </div>
                       </div>
-                      {appointment.rating && (
-                        <div className="flex items-center gap-2 mt-3">
-                          <span className="text-sm text-gray-600">Your rating:</span>
-                          <div className="flex">
-                            {renderStars(appointment.rating)}
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-lg font-semibold text-gray-900 mb-2">৳{appointment.cost}</div>
+                    <div className="text-lg font-semibold text-gray-900 mb-2">৳{appointment.fees_max || appointment.fees_min || 0}</div>
                     <div className="flex items-center gap-2">
                       {appointment.status === 'completed' && (
                         <>
@@ -303,12 +297,6 @@ export default function AppointmentHistory() {
                   </div>
                 </div>
                 
-                {appointment.notes && (
-                  <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                    <h4 className="font-medium text-gray-900 mb-2">Session Notes</h4>
-                    <p className="text-gray-700 text-sm">{appointment.notes}</p>
-                  </div>
-                )}
               </div>
             ))
           ) : (
@@ -334,5 +322,13 @@ export default function AppointmentHistory() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AppointmentHistoryWrapper() {
+  return (
+    <RequireAuth>
+      <AppointmentHistory />
+    </RequireAuth>
   );
 }

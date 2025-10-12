@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import mysql from 'mysql2/promise';
+import mysql, { RowDataPacket } from 'mysql2/promise';
 
 const dbConfig = {
   host: 'localhost',
@@ -10,170 +10,75 @@ const dbConfig = {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    console.log('API: Fetching user profile for ID:', params.id);
-    
-    if (!params.id || params.id === 'undefined' || params.id === 'null') {
-      console.error('API: Invalid user ID provided:', params.id);
+    const { id } = await params;
+    console.log('API: Fetching user profile for ID:', id);
+
+    if (!id || id === 'undefined' || id === 'null') {
+      console.error('API: Invalid user ID provided:', id);
       return NextResponse.json({ error: 'Invalid user ID' }, { status: 400 });
     }
 
     const connection = await mysql.createConnection(dbConfig);
-    console.log('API: Database connection established');
-    
-    // First check if it's a user
-    const [userRows] = await connection.execute(
-      'SELECT * FROM users WHERE user_id = ?',
-      [params.id]
-    );
-    
-    const users = userRows as any[];
-    console.log('API: User query result:', users.length > 0 ? 'Found user' : 'No user found');
-    
-    if (users.length > 0) {
+
+    // Try to find user in users table first
+    const userQuery = 'SELECT * FROM users WHERE user_id = ?';
+    const [userResults] = await connection.execute(userQuery, [id]) as [RowDataPacket[], any];
+
+    if (userResults.length > 0) {
+      const user = userResults[0];
       await connection.end();
-      console.log('API: Returning user data');
-      return NextResponse.json({ ...users[0], user_type: 'user' });
+      
+      return NextResponse.json({
+        user_id: user.user_id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        date_of_birth: user.date_of_birth,
+        gender: user.gender,
+        Hobby: user.Hobby,
+        profession: user.profession,
+        free_text: user.free_text,
+        role: 'user',
+        user_type: 'user'
+      });
     }
 
-    // If not found in users, check therapists table
-    const [therapistRows] = await connection.execute(
-      'SELECT * FROM therapists WHERE therapist_id = ?',
-      [params.id]
-    );
-    
+    // If not found in users, try therapists table
+    const therapistQuery = 'SELECT * FROM therapists WHERE therapist_id = ?';
+    const [therapistResults] = await connection.execute(therapistQuery, [id]) as [RowDataPacket[], any];
+
+    if (therapistResults.length > 0) {
+      const therapist = therapistResults[0];
+      await connection.end();
+      
+      return NextResponse.json({
+        therapist_id: therapist.therapist_id,
+        name: therapist.name,
+        email: therapist.email,
+        phone: therapist.phone,
+        license_no: therapist.license_no,
+        years_experience: therapist.years_experience,
+        fees_min: therapist.fees_min,
+        fees_max: therapist.fees_max,
+        bio: therapist.bio,
+        languages: therapist.languages,
+        educational_info: therapist.educational_info,
+        Interested_field: therapist.Interested_field,
+        rating: therapist.rating,
+        image: therapist.image,
+        role: 'therapist',
+        user_type: 'therapist'
+      });
+    }
+
     await connection.end();
-    
-    const therapists = therapistRows as any[];
-    console.log('API: Therapist query result:', therapists.length > 0 ? 'Found therapist' : 'No therapist found');
-    
-    if (therapists.length === 0) {
-      console.error('API: User not found in either table for ID:', params.id);
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-    
-    console.log('API: Returning therapist data');
-    return NextResponse.json({ ...therapists[0], user_type: 'therapist' });
+    return NextResponse.json({ error: 'User not found' }, { status: 404 });
+
   } catch (error) {
-    console.error('API: Database error:', error);
-    return NextResponse.json({ 
-      error: 'Internal server error', 
-      details: error instanceof Error ? error.message : 'Unknown error' 
-    }, { status: 500 });
-  }
-}
-
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const body = await request.json();
-    const connection = await mysql.createConnection(dbConfig);
-    
-    console.log('API: Updating profile for ID:', params.id, 'with data:', body);
-    
-    // Determine if it's a user or therapist based on the data structure
-    const isTherapist = body.license_no !== undefined || body.years_experience !== undefined || body.user_type === 'therapist';
-    
-    if (isTherapist) {
-      // Update therapist profile
-      const {
-        name,
-        email,
-        license_no,
-        years_experience,
-        gender,
-        fees_min,
-        fees_max,
-        bio,
-        languages,
-        educational_info,
-        Interested_field,
-        image
-      } = body;
-
-      const [result] = await connection.execute(
-        `UPDATE therapists SET 
-          name = ?, 
-          email = ?, 
-          license_no = ?, 
-          years_experience = ?, 
-          gender = ?, 
-          fees_min = ?, 
-          fees_max = ?, 
-          bio = ?, 
-          languages = ?, 
-          educational_info = ?,
-          Interested_field = ?,
-          image = ?
-        WHERE therapist_id = ?`,
-        [
-          name,
-          email,
-          license_no,
-          years_experience,
-          gender,
-          fees_min || 0,
-          fees_max || 0,
-          bio,
-          languages,
-          educational_info,
-          Interested_field,
-          image,
-          params.id
-        ]
-      );
-      console.log('API: Therapist update result:', result);
-    } else {
-      // Update user profile
-      const {
-        name,
-        email,
-        phone,
-        date_of_birth,
-        gender,
-        Hobby,
-        profession,
-        free_text
-      } = body;
-
-      const [result] = await connection.execute(
-        `UPDATE users SET 
-          name = ?, 
-          email = ?, 
-          phone = ?, 
-          date_of_birth = ?, 
-          gender = ?, 
-          Hobby = ?, 
-          profession = ?, 
-          free_text = ?
-        WHERE user_id = ?`,
-        [
-          name,
-          email,
-          phone,
-          date_of_birth,
-          gender,
-          Hobby,
-          profession,
-          free_text,
-          params.id
-        ]
-      );
-      console.log('API: User update result:', result);
-    }
-    
-    await connection.end();
-    
-    return NextResponse.json({ message: 'Profile updated successfully' });
-  } catch (error) {
-    console.error('API: Database error:', error);
-    return NextResponse.json({ 
-      error: 'Internal server error', 
-      details: error instanceof Error ? error.message : 'Unknown error' 
-    }, { status: 500 });
+    console.error('API Error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useAuth } from "@/lib/auth-context";
 import { User, Mail, Phone, Calendar, MapPin, Edit, Save, X, Camera, Shield, Award, Clock, BookOpen, Heart } from "lucide-react";
 
 interface UserProfile {
@@ -29,6 +30,7 @@ interface UserProfile {
 }
 
 export default function Profile() {
+  const { user: authUser, isLoading: authLoading } = useAuth();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedUser, setEditedUser] = useState<UserProfile | null>(null);
@@ -36,26 +38,16 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (!authLoading && authUser) {
       fetchUserProfile();
+    } else if (!authLoading) {
+      setLoading(false);
     }
-  }, []);
+  }, [authUser, authLoading]);
 
   const fetchUserProfile = async () => {
     try {
-      const userData = localStorage.getItem('user');
-      console.log('User data from localStorage:', userData);
-      
-      if (!userData) {
-        console.error('No user data in localStorage');
-        setLoading(false);
-        return;
-      }
-
-      const userInfo = JSON.parse(userData);
-      console.log('Parsed user info:', userInfo);
-      
-      const userId = userInfo.user_id || userInfo.therapist_id;
+      const userId = authUser?.role === 'therapist' ? authUser.therapist_id : authUser?.user_id;
       console.log('Using userId:', userId);
       
       if (!userId) {
@@ -174,7 +166,7 @@ export default function Profile() {
     return user?.user_type === 'therapist' || user?.therapist_id !== undefined;
   };
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -185,7 +177,7 @@ export default function Profile() {
     );
   }
 
-  if (!user) {
+  if (!authUser || !user) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -215,10 +207,10 @@ export default function Profile() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-modern">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Header */}
-        <div className="bg-white rounded-xl shadow-sm border p-6 mb-8">
+        <div className="card-modern border-0 p-6 mb-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-6">
               <div className="relative">
@@ -252,7 +244,7 @@ export default function Profile() {
               {!isEditing ? (
                 <button 
                   onClick={handleEdit}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-[#2596be] text-white rounded-lg hover:bg-[#1d7a99]"
+                  className="btn-primary inline-flex items-center gap-2 px-4 py-2"
                 >
                   <Edit className="w-4 h-4" />
                   Edit Profile

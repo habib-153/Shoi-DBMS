@@ -1,90 +1,94 @@
 import { NextRequest, NextResponse } from 'next/server';
-import mysql from 'mysql2/promise';
-
-const pool = mysql.createPool({
-  host: 'localhost',
-  port: 3306,
-  user: 'root',
-  password: '',
-  database: 'shoi',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
-});
+import { query } from '@/lib/db';
 
 // GET - Fetch therapist statistics
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const connection = await pool.getConnection();
-    const therapistId = params.id;
+    const resolvedParams = await params;
+    const therapistId = resolvedParams.id;
 
-    try {
-      // Get total patients (unique users who had appointments with this therapist)
-      const [patientsResult] = await connection.execute(
-        `SELECT COUNT(DISTINCT user_id) as total_patients 
-         FROM appointments 
-         WHERE therapist_id = ?`,
-        [therapistId]
-      );
+    // Get total patients (unique users who had appointments with this therapist)
+    const patientsResult = await query(
+      `SELECT COUNT(DISTINCT user_id) as total_patients 
+       FROM appointments 
+       WHERE therapist_id = ?`,
+      [therapistId]
+    ) as any[];
 
-      // Get completed sessions count
-      const [sessionsResult] = await connection.execute(
-        `SELECT COUNT(*) as completed_sessions 
-         FROM appointments 
-         WHERE therapist_id = ? AND status = 'completed'`,
-        [therapistId]
-      );
+    // Get completed sessions count
+    const sessionsResult = await query(
+      `SELECT COUNT(*) as completed_sessions 
+       FROM sessions s
+       JOIN appointments a ON s.appointment_id = a.appointment_id
+       WHERE a.therapist_id = ?`,
+      [therapistId]
+    ) as any[];
 
-      // Get weekly revenue (assuming appointments table has a fees column)
-      const weekStart = new Date();
-      weekStart.setDate(weekStart.getDate() - 7);
-      const [revenueResult] = await connection.execute(
-        `SELECT COALESCE(SUM(fees), 0) as weekly_revenue 
-         FROM appointments 
-         WHERE therapist_id = ? 
-         AND status = 'completed' 
-         AND appointment_date >= ?`,
-        [therapistId, weekStart.toISOString().split('T')[0]]
-      );
+    // Get today's appointments count - use local date
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const today = `${year}-${month}-${day}`;
+    
+    const todayResult = await query(
+      `SELECT COUNT(*) as today_appointments 
+       FROM appointments 
+       WHERE therapist_id = ? 
+       AND DATE(start_time) = ?`,
+      [therapistId, today]
+    ) as any[];
 
-      // Get average rating from therapist_ratings table (if it exists)
-      const [ratingResult] = await connection.execute(
-        `SELECT COALESCE(AVG(rating), 0) as average_rating 
-         FROM therapist_ratings 
-         WHERE therapist_id = ?`,
-        [therapistId]
-      );
+    // Get weekly revenue - simplified calculation based on completed appointments
+    const weekStartDate = new Date();
+    weekStartDate.setDate(weekStartDate.getDate() - 7);
+    const weekYear = weekStartDate.getFullYear();
+    const weekMonth = String(weekStartDate.getMonth() + 1).padStart(2, '0');
+    const weekDay = String(weekStartDate.getDate()).padStart(2, '0');
+    const weekStartStr = `${weekYear}-${weekMonth}-${weekDay}`;
+    
+    const weeklyAppointments = await query(
+      `SELECT COUNT(*) as count
+       FROM appointments a
+       WHERE a.therapist_id = ? 
+       AND a.status IN ('completed', 'paid')
+       AND DATE(a.start_time) >= ?`,
+      [therapistId, weekStartStr]
+    ) as any[];
+    
+    // Estimate revenue: count * average fee (using 1500 as default)
+    const weeklyRevenue = (weeklyAppointments[0]?.count || 0) * 1500;
 
-      // Get today's appointments count
-      const today = new Date().toISOString().split('T')[0];
-      const [todayResult] = await connection.execute(
-        `SELECT COUNT(*) as today_appointments 
-         FROM appointments 
-         WHERE therapist_id = ? 
-         AND DATE(appointment_date) = ?`,
-        [therapistId, today]
-      );
+    // Get average rating from sessions
+    const ratingResult = await query(
+      `SELECT AVG(s.rating_by_user) as avg_rating 
+       FROM sessions s
+       JOIN appointments a ON s.appointment_id = a.appointment_id
+       WHERE a.therapist_id = ? 
+       AND s.rating_by_user IS NOT NULL`,
+      [therapistId]
+    ) as any[];
 
-      const stats = {
-        totalPatients: (patientsResult as any)[0]?.total_patients || 0,
-        completedSessions: (sessionsResult as any)[0]?.completed_sessions || 0,
-        weeklyRevenue: (revenueResult as any)[0]?.weekly_revenue || 0,
-        averageRating: (ratingResult as any)[0]?.average_rating || 0,
-        todayAppointments: (todayResult as any)[0]?.today_appointments || 0
-      };
+    const stats = {
+      totalPatients: parseInt(patientsResult[0]?.total_patients) || 0,
+      completedSessions: parseInt(sessionsResult[0]?.completed_sessions) || 0,
+      weeklyRevenue: weeklyRevenue,
+      averageRating: parseFloat(ratingResult[0]?.avg_rating || 0).toFixed(1),
+      todayAppointments: parseInt(todayResult[0]?.today_appointments) || 0
+    };
 
-      return NextResponse.json(stats);
+    return NextResponse.json(stats);
 
-    } finally {
-      connection.release();
-    }
   } catch (error) {
     console.error('Error fetching therapist stats:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch therapist statistics' },
+      { 
+        error: 'Failed to fetch therapist statistics',
+        details: error instanceof Error ? error.message : String(error)
+      },
       { status: 500 }
     );
   }

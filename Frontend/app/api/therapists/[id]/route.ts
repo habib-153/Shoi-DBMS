@@ -10,14 +10,15 @@ const dbConfig = {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const connection = await mysql.createConnection(dbConfig);
     
     const [rows] = await connection.execute(
-      'SELECT * FROM therapist WHERE therapist_id = ?',
-      [params.id]
+      'SELECT * FROM therapists WHERE therapist_id = ?',
+      [id]
     );
     
     await connection.end();
@@ -36,9 +37,10 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const body = await request.json();
     const {
       name,
@@ -56,7 +58,7 @@ export async function PUT(
     const connection = await mysql.createConnection(dbConfig);
     
     const [result] = await connection.execute(
-      `UPDATE therapist SET 
+      `UPDATE therapists SET 
         name = ?, 
         email = ?, 
         license_no = ?, 
@@ -79,7 +81,7 @@ export async function PUT(
         bio,
         languages,
         educational_info,
-        params.id
+        id
       ]
     );
     

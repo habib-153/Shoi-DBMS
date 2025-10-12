@@ -157,11 +157,11 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-br from-[#2596be]/10 via-sky-50 to-indigo-50 flex items-center justify-center px-4">
-      <Card className="relative w-full max-w-5xl p-6 sm:p-8 bg-white/90 backdrop-blur-sm shadow-xl border-0">
+    <div className="relative min-h-screen bg-gradient-modern flex items-center justify-center px-4">
+      <Card className="relative w-full max-w-5xl p-6 sm:p-8 card-modern border-0">
         {/* header */}
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-[#2596be]">
+          <h2 className="text-2xl sm:text-3xl font-bold text-primary">
             সই — Registration
           </h2>
           <a href="/login" className="text-sm text-[#2596be] hover:underline">

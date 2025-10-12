@@ -23,22 +23,26 @@ export default function TherapistAppointments() {
   const [dateFilter, setDateFilter] = useState("all");
 
   useEffect(() => {
-    fetchAppointments();
+    fetchTodayAppointments();
   }, []);
 
   useEffect(() => {
     filterAppointments();
   }, [appointments, statusFilter, dateFilter]);
 
-  const fetchAppointments = async () => {
+  const fetchTodayAppointments = async () => {
     try {
-      const userData = localStorage.getItem('user');
+      const userData = localStorage.getItem('therapist') || localStorage.getItem('user');
       if (userData) {
-        const therapist = JSON.parse(userData);
-        const response = await fetch(`/api/appointments?therapist_id=${therapist.therapist_id}&include_past=true`);
+        const therapistData = JSON.parse(userData);
+        const therapistId = therapistData.therapist_id || therapistData.id || 202; // Use 202 as fallback
+        // Fetch all appointments, not just today's
+        const response = await fetch(`/api/therapists/${therapistId}/appointments`);
         if (response.ok) {
           const data = await response.json();
-          setAppointments(data.appointments || []);
+          if (data.success) {
+            setAppointments(data.appointments || []);
+          }
         }
       }
     } catch (error) {
@@ -120,8 +124,8 @@ export default function TherapistAppointments() {
     });
   };
 
-  const formatTime = (timeString: string) => {
-    return new Date(`1970-01-01T${timeString}`).toLocaleTimeString('en-US', {
+  const formatTime = (dateTimeString: string) => {
+    return new Date(dateTimeString).toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true
@@ -130,10 +134,8 @@ export default function TherapistAppointments() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'scheduled': return 'bg-blue-100 text-blue-800';
       case 'completed': return 'bg-green-100 text-green-800';
       case 'cancelled': return 'bg-red-100 text-red-800';
-      case 'no-show': return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -177,10 +179,8 @@ export default function TherapistAppointments() {
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2596be] focus:border-transparent"
             >
               <option value="all">All Statuses</option>
-              <option value="scheduled">Scheduled</option>
               <option value="completed">Completed</option>
               <option value="cancelled">Cancelled</option>
-              <option value="no-show">No Show</option>
             </select>
             
             <select
@@ -221,15 +221,15 @@ export default function TherapistAppointments() {
                       <div className="flex items-center gap-6 text-sm text-gray-500">
                         <div className="flex items-center gap-1">
                           <Calendar className="w-4 h-4" />
-                          <span>{formatDate(appointment.appointment_date)}</span>
+                          <span>{formatDate(appointment.start_time)}</span>
                         </div>
                         <div className="flex items-center gap-1">
                           <Clock className="w-4 h-4" />
                           <span>{formatTime(appointment.start_time)} - {formatTime(appointment.end_time)}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          {getSessionIcon(appointment.session_type)}
-                          <span className="capitalize">{appointment.session_type}</span>
+                          <Calendar className="w-4 h-4" />
+                          <span className="capitalize">Session</span>
                         </div>
                       </div>
                       {appointment.notes && (
@@ -241,24 +241,6 @@ export default function TherapistAppointments() {
                   </div>
                   
                   <div className="flex items-center gap-2">
-                    {appointment.status === 'scheduled' && (
-                      <>
-                        <button
-                          onClick={() => updateAppointmentStatus(appointment.appointment_id, 'completed')}
-                          className="flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 text-sm"
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                          Complete
-                        </button>
-                        <button
-                          onClick={() => updateAppointmentStatus(appointment.appointment_id, 'cancelled')}
-                          className="flex items-center gap-1 px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm"
-                        >
-                          <X className="w-4 h-4" />
-                          Cancel
-                        </button>
-                      </>
-                    )}
                     <button className="p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-50">
                       <MessageCircle className="w-4 h-4" />
                     </button>
