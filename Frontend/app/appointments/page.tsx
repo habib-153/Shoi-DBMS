@@ -185,7 +185,7 @@ function AppointmentPageContent() {
   }, [therapists, searchQuery, gender, minRating, feeMin, feeMax, sortBy]);
 
   // ====== IMPORTANT: force-redirect bookNow ======
-  async function bookNow() {
+  async function bookNow(shouldPayNow: boolean) {
     if (!selectedTherapist || !pickedSlot || isBooking) {
       if (isBooking) return; // Prevent double-clicks
       toast.warning("Please select a therapist and time slot");
@@ -211,66 +211,49 @@ function AppointmentPageContent() {
           therapist_id: selectedTherapist.therapist_id,
           start_time: bookedSlot.start,
           end_time: bookedSlot.end,
+          status: shouldPayNow ? 'pending_payment' : 'scheduled',
         }),
       });
       const j1 = await r1.json();
       
       console.log('Appointment response:', j1); // Debug log
-      console.log('Response status:', r1.status, 'OK:', r1.ok);
-      console.log('JSON ok field:', j1.ok, 'appointment_id:', j1.appointment_id, 'type:', typeof j1.appointment_id);
       
-      if (!r1.ok) {
-        console.log('HTTP request failed');
-        throw new Error(j1.message || `Appointment failed (${r1.status})`);
-      }
-      
-      if (!j1.ok) {
-        console.log('API response indicates failure');
+      if (!r1.ok || !j1.ok || typeof j1.appointment_id !== 'number' || j1.appointment_id < 0) {
         throw new Error(j1.message || 'Failed to create appointment');
-      }
-      
-      if (typeof j1.appointment_id !== 'number' || j1.appointment_id < 0) {
-        console.log('Invalid appointment ID in response:', j1.appointment_id);
-        throw new Error('Failed to get valid appointment ID');
       }
       
       console.log('Appointment created successfully with ID:', j1.appointment_id);
 
-      // Show success notification
-      toast.success("Appointment booked successfully! Redirecting to payment...");
-
       // Refresh slots to get the latest state from server
       refreshSlots();
 
-      // 2) payment intent
-      const r2 = await fetch("/api/payments/intent", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ appointment_id: j1.appointment_id, user_id: user?.user_id || user?.therapist_id }),
-      });
-      const j2 = await r2.json();
-      
-      console.log('Payment response:', j2); // Debug log
-      
-      if (!r2.ok) {
-        throw new Error(j2.message || `Payment init failed (${r2.status})`);
-      }
-      
-      if (!j2.ok || !j2.payment_id) {
-        throw new Error(j2.message || 'Failed to get payment ID');
+      if (shouldPayNow) {
+        // Show success notification and redirect to payment
+        toast.success("Appointment booked! Redirecting to payment...");
+
+        // 2) payment intent
+        const r2 = await fetch("/api/payments/intent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ appointment_id: j1.appointment_id, user_id: user?.user_id || user?.therapist_id }),
+        });
+        const j2 = await r2.json();
+        
+        if (!r2.ok || !j2.ok || !j2.payment_id) {
+          throw new Error(j2.message || 'Failed to initialize payment');
+        }
+
+        // 3) redirect URL
+        const target = `/pay/${j1.appointment_id}?pid=${j2.payment_id}`;
+        router.push(target);
+
+      } else {
+        // Pay Later logic
+        toast.success("Appointment booked successfully! You can pay later from your dashboard.");
+        // Redirect to dashboard or appointments history
+        router.push('/appointments/history');
       }
 
-      // 3) redirect URL
-      const target = `/pay/${j1.appointment_id}?pid=${j2.payment_id}`;
-      const abs = new URL(target, window.location.origin).toString();
-      console.log("[BOOK] redirect:", abs);
-
-      // try router first
-      try { router.push(target); } catch {}
-      // force fallback (যেকোনো পরিস্থিতিতে নেবে)
-      setTimeout(() => {
-        if (window.location.href !== abs) window.location.assign(abs);
-      }, 60);
     } catch (err: any) {
       console.error(err);
       // Restore the slot if booking failed
@@ -546,17 +529,26 @@ function AppointmentPageContent() {
               </div>
             </div>
 
-            <button 
-              onClick={bookNow} 
-              disabled={!selectedTherapist || !pickedSlot || isBooking} 
-              className="mt-6 w-full rounded-xl bg-[#2596be] text-white py-3 font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {isBooking && (
-                <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
-              )}
-              {isBooking ? "Booking..." : "Confirm & Continue"}
-            </button>
-            <p className="mt-3 text-xs text-gray-500">You'll be redirected to payment on the next step.</p>
+            <div className="mt-4 space-y-2">
+              <button 
+                onClick={() => bookNow(true)} 
+                disabled={!selectedTherapist || !pickedSlot || isBooking} 
+                className="w-full rounded-xl bg-[#2596be] text-white py-3 font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isBooking && (
+                  <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
+                )}
+                {isBooking ? "Processing..." : "Pay Now"}
+              </button>
+              <button 
+                onClick={() => bookNow(false)} 
+                disabled={!selectedTherapist || !pickedSlot || isBooking}
+                className="w-full rounded-xl bg-gray-200 text-gray-800 py-3 font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                Pay Later
+              </button>
+            </div>
+            <p className="mt-3 text-xs text-gray-500">You can pay now or pay later from your dashboard.</p>
           </div>
         </aside>
       </div>

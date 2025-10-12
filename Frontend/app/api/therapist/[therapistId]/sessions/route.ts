@@ -16,9 +16,6 @@ export async function GET(
         s.appointment_id,
         s.session_date,
         s.duration_min,
-        s.rating_by_user,
-        s.next_actions,
-        s.created_at as session_created_at,
         a.user_id,
         a.therapist_id,
         a.start_time,
@@ -30,9 +27,9 @@ export async function GET(
         t.name as therapist_name,
         -- Check if session note exists
         (SELECT COUNT(*) FROM session_notes sn WHERE sn.session_id = s.session_id) as has_notes,
-        -- Get the note if it exists
-        (SELECT note_id FROM session_notes sn WHERE sn.session_id = s.session_id LIMIT 1) as note_id,
-        (SELECT summary FROM session_notes sn WHERE sn.session_id = s.session_id LIMIT 1) as note_summary
+        -- Get the most recent note if it exists
+        (SELECT note_id FROM session_notes sn WHERE sn.session_id = s.session_id ORDER BY sn.created_at DESC LIMIT 1) as note_id,
+        (SELECT summary FROM session_notes sn WHERE sn.session_id = s.session_id ORDER BY sn.created_at DESC LIMIT 1) as note_summary
       FROM sessions s
       JOIN appointments a ON s.appointment_id = a.appointment_id
       JOIN users u ON a.user_id = u.user_id
@@ -109,13 +106,13 @@ export async function POST(
     const defaultSessionDate = session_date || `${year}-${month}-${day}`;
 
     // Calculate duration from appointment times if not provided
-    const startTime = new Date(appointment.start_time);
-    const endTime = new Date(appointment.end_time);
+    const startTime = new Date(`1970-01-01T${appointment.start_time}`);
+    const endTime = new Date(`1970-01-01T${appointment.end_time}`);
     const calculatedDuration = duration_min || Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
 
     const result: any = await query(
-      `INSERT INTO sessions (appointment_id, session_date, duration_min, status)
-       VALUES (?, ?, ?, 'completed')`,
+      `INSERT INTO sessions (appointment_id, session_date, duration_min)
+       VALUES (?, ?, ?)`,
       [appointment_id, defaultSessionDate, calculatedDuration]
     );
 

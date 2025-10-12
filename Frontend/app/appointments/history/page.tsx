@@ -25,6 +25,47 @@ function AppointmentHistory() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [dateRange, setDateRange] = useState("all");
+  const [payingAppointment, setPayingAppointment] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetchAppointments();
+  }, []);
+
+  useEffect(() => {
+    filterAppointments();
+  }, [appointments, statusFilter, searchTerm, dateRange]);
+
+  const handlePayNow = async (appointmentId: number) => {
+    if (payingAppointment || !user) return;
+    
+    setPayingAppointment(appointmentId);
+    
+    try {
+      // Create payment intent for this appointment
+      const response = await fetch('/api/payments/intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appointment_id: appointmentId,
+          user_id: user.user_id || user.therapist_id
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.ok) {
+        // Redirect to payment page
+        window.location.href = `/pay/${appointmentId}?pid=${data.payment_id}`;
+      } else {
+        alert('Failed to create payment. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error creating payment:', error);
+      alert('Failed to create payment. Please try again.');
+    } finally {
+      setPayingAppointment(null);
+    }
+  };
 
   useEffect(() => {
     fetchAppointments();
@@ -285,13 +326,33 @@ function AppointmentHistory() {
                           </button>
                         </>
                       )}
-                      {appointment.status === 'scheduled' && (
-                        <Link 
-                          href={`/appointments/${appointment.appointment_id}`}
-                          className="px-3 py-1 bg-[#2596be] text-white rounded-lg hover:bg-[#1d7a99] text-sm"
-                        >
-                          View Details
-                        </Link>
+                      {(appointment.status === 'scheduled' || appointment.status === 'pending_payment') && (
+                        <div className="flex gap-2">
+                          {appointment.payment_status !== 'completed' && appointment.payment_status !== 'paid' && (
+                            appointment.payment_id ? (
+                              <Link 
+                                href={`/pay/${appointment.appointment_id}?pid=${appointment.payment_id}`}
+                                className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+                              >
+                                Pay Now
+                              </Link>
+                            ) : (
+                              <button
+                                onClick={() => handlePayNow(appointment.appointment_id)}
+                                disabled={payingAppointment === appointment.appointment_id}
+                                className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {payingAppointment === appointment.appointment_id ? 'Processing...' : 'Pay Now'}
+                              </button>
+                            )
+                          )}
+                          <Link 
+                            href={`/appointments/${appointment.appointment_id}`}
+                            className="px-3 py-1 bg-[#2596be] text-white rounded-lg hover:bg-[#1d7a99] text-sm"
+                          >
+                            View Details
+                          </Link>
+                        </div>
                       )}
                     </div>
                   </div>

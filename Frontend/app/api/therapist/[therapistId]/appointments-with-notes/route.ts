@@ -17,7 +17,6 @@ export async function GET(
         a.therapist_id,
         a.start_time,
         a.end_time,
-        a.appointment_date,
         a.status as appointment_status,
         a.created_at as appointment_created_at,
         u.name as user_name,
@@ -38,7 +37,7 @@ export async function GET(
       LEFT JOIN session_notes sn ON s.session_id = sn.session_id
       WHERE a.therapist_id = ?
         AND a.status = 'completed'
-      ORDER BY a.appointment_date DESC, a.start_time DESC
+      ORDER BY a.created_at DESC, a.start_time DESC
     `, [therapistId]);
 
     return NextResponse.json({

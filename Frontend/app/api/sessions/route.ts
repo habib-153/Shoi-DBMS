@@ -15,8 +15,6 @@ export async function GET(request: NextRequest) {
         s.appointment_id,
         s.session_date,
         s.duration_min,
-        s.rating_by_user,
-        s.next_actions,
         a.user_id,
         a.therapist_id,
         a.start_time as appointment_start,
@@ -104,9 +102,9 @@ export async function POST(request: NextRequest) {
 
     // Create session
     const result: any = await query(
-      `INSERT INTO sessions (appointment_id, session_date, start_time, end_time, status, notes, duration_min)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [appointment_id, session_date, start_time, end_time, status, notes, duration_min]
+      `INSERT INTO sessions (appointment_id, session_date, duration_min)
+       VALUES (?, ?, ?)`,
+      [appointment_id, session_date, duration_min]
     );
 
     return NextResponse.json({

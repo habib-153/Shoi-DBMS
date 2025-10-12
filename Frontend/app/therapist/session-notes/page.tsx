@@ -11,7 +11,6 @@ interface AppointmentWithSession {
   therapist_id: number;
   start_time: string;
   end_time: string;
-  appointment_date: string;
   appointment_status: string;
   appointment_created_at: string;
   session_id: number | null;

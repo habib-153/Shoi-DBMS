@@ -307,10 +307,10 @@ export default function TherapistDashboard() {
             <p className="text-muted-foreground text-sm">Access patient information</p>
           </Link>
           
-          <Link href="/therapist/session-notes" className="card-modern border-0 p-6 hover:shadow-md transition-shadow group">
-            <FileText className="h-8 w-8 text-[#2596be] mb-3 group-hover:scale-110 transition-transform" />
-            <h3 className="font-semibold text-lg text-foreground">Session Notes</h3>
-            <p className="text-muted-foreground text-sm">View patient session notes</p>
+                    <Link href="/therapist/sessions" className="card-modern border-0 p-6 hover:shadow-md transition-shadow group">
+            <FileText className="w-8 h-8 text-blue-600 mb-3" />
+            <h3 className="font-semibold text-lg text-foreground">Sessions</h3>
+            <p className="text-muted-foreground text-sm">Manage therapy sessions and notes</p>
           </Link>
           
           <Link href="/messages" className="card-modern border-0 p-6 hover:shadow-md transition-shadow group">
@@ -366,12 +366,12 @@ export default function TherapistDashboard() {
           )}
         </div>
 
-        {/* Two Column Layout - Recent Session Notes & Upcoming Appointments */}
+        {/* Two Column Layout - Recent Sessions & Upcoming Appointments */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          {/* Recent Session Notes */}
+          {/* Recent Sessions */}
           <div className="card-modern border-0 p-6">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-foreground">Recent Session Notes</h2>
+              <h2 className="text-xl font-bold text-foreground">Recent Sessions</h2>
               <Link href="/therapist/sessions" className="text-[#2596be] hover:text-[#1d7a99] font-medium">
                 View All
               </Link>
@@ -406,7 +406,9 @@ export default function TherapistDashboard() {
             ) : (
               <div className="text-center py-8">
                 <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-                <p className="text-muted-foreground">No session notes yet</p>
+                              ) : (
+                <p className="text-muted-foreground">No sessions yet</p>
+              )}
               </div>
             )}
           </div>
