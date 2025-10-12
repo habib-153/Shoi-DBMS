@@ -1,429 +1,298 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, Filter, User, Calendar, Phone, Mail, Eye, MessageCircle, FileText, Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Search, User, Calendar, Mail, Eye, MessageCircle, FileText, Plus, Brain, AlertCircle, Heart, Activity } from "lucide-react";
 
 interface Patient {
-  id: number;
+  user_id: number;
   name: string;
   email: string;
-  phone: string;
-  age: number;
-  gender: string;
-  next_appointment: string | null;
-  last_session: string | null;
-  total_sessions: number;
-  status: 'active' | 'inactive';
-  notes: string;
-  emergency_contact: string;
+  total_appointments: number;
+  last_appointment: string | null;
+  assessment_count: number;
+  avg_mood: number | null;
 }
 
-export default function TherapistPatients() {
+export default function TherapistPatientsPage() {
+  const router = useRouter();
   const [patients, setPatients] = useState<Patient[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
-  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
-  const [showPatientModal, setShowPatientModal] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [therapist, setTherapist] = useState<any>(null);
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    fetchPatients();
+    setIsClient(true);
   }, []);
+
+  useEffect(() => {
+    if (isClient) {
+      fetchTherapistData();
+    }
+  }, [isClient]);
+
+  useEffect(() => {
+    if (therapist?.therapist_id) {
+      fetchPatients();
+    }
+  }, [therapist]);
+
+  const fetchTherapistData = async () => {
+    if (typeof window !== 'undefined') {
+      const userData = localStorage.getItem('therapist') || localStorage.getItem('user');
+      if (userData) {
+        const therapistData = JSON.parse(userData);
+        setTherapist(therapistData);
+      } else {
+        setTherapist({ therapist_id: 202, name: 'Demo Therapist' });
+      }
+    }
+  };
 
   const fetchPatients = async () => {
     try {
-      // Mock data for demonstration - replace with actual API call
-      const mockPatients: Patient[] = [
-        {
-          id: 1,
-          name: "Sarah Ahmed",
-          email: "sarah.ahmed@email.com",
-          phone: "+880-1234567890",
-          age: 28,
-          gender: "Female",
-          next_appointment: "2024-01-16T15:00:00Z",
-          last_session: "2024-01-10T14:00:00Z",
-          total_sessions: 12,
-          status: 'active',
-          notes: "Anxiety disorder, responds well to CBT techniques",
-          emergency_contact: "+880-9876543210"
-        },
-        {
-          id: 2,
-          name: "Rafiq Hassan",
-          email: "rafiq.hassan@email.com",
-          phone: "+880-1987654321",
-          age: 35,
-          gender: "Male",
-          next_appointment: "2024-01-17T10:00:00Z",
-          last_session: "2024-01-12T16:00:00Z",
-          total_sessions: 8,
-          status: 'active',
-          notes: "Work-related stress, showing good progress",
-          emergency_contact: "+880-5555555555"
-        },
-        {
-          id: 3,
-          name: "Fatima Khan",
-          email: "fatima.khan@email.com",
-          phone: "+880-1555444333",
-          age: 42,
-          gender: "Female",
-          next_appointment: null,
-          last_session: "2024-01-08T11:00:00Z",
-          total_sessions: 6,
-          status: 'inactive',
-          notes: "Depression management, taking a break from sessions",
-          emergency_contact: "+880-7777777777"
-        },
-        {
-          id: 4,
-          name: "Karim Rahman",
-          email: "karim.rahman@email.com",
-          phone: "+880-1666777888",
-          age: 31,
-          gender: "Male",
-          next_appointment: "2024-01-18T13:00:00Z",
-          last_session: "2024-01-14T15:00:00Z",
-          total_sessions: 4,
-          status: 'active',
-          notes: "Relationship counseling, new patient",
-          emergency_contact: "+880-8888888888"
-        }
-      ];
-
-      setPatients(mockPatients);
-    } catch (error) {
-      console.error('Error fetching patients:', error);
+      setLoading(true);
+      const response = await fetch(`/api/therapists/${therapist.therapist_id}/patients`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch patients');
+      }
+      const data = await response.json();
+      if (data.success) {
+        setPatients(data.patients);
+      } else {
+        setError(data.error || 'Failed to fetch patients');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);
     }
   };
 
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "N/A";
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
   const filteredPatients = patients.filter(patient => {
-    const matchesSearch = patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         patient.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || patient.status === statusFilter;
+    const matchesSearch = patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         patient.email.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = statusFilter === 'all' || 
+                         (statusFilter === 'active' && patient.total_appointments > 0) ||
+                         (statusFilter === 'inactive' && patient.total_appointments === 0);
     
     return matchesSearch && matchesStatus;
   });
 
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return 'Not scheduled';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const openPatientModal = (patient: Patient) => {
-    setSelectedPatient(patient);
-    setShowPatientModal(true);
-  };
-
-  const closePatientModal = () => {
-    setSelectedPatient(null);
-    setShowPatientModal(false);
-  };
-
-  if (loading) {
+  if (!isClient || loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-modern flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2596be] mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading patients...</p>
+          <p className="text-muted-foreground">Loading patients...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-modern flex items-center justify-center">
+        <div className="text-center card-modern p-8 max-w-md mx-4">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-foreground mb-2">Error Loading Patients</h2>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="btn-primary px-6 py-2"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-modern">
+      <div className="glass border-b border-white/10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-6">
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">Patient Management</h1>
+              <p className="text-muted-foreground">Manage your patients and track their progress</p>
+            </div>
+            <button className="btn-primary px-4 py-2 flex items-center gap-2">
+              <Plus className="w-4 h-4" />
+              Add Patient
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Patients</h1>
-            <p className="text-gray-600">Manage your patient records and sessions</p>
-          </div>
-          <button className="inline-flex items-center gap-2 px-4 py-2 bg-[#2596be] text-white rounded-lg hover:bg-[#1d7a99]">
-            <Plus className="w-5 h-5" />
-            Add New Patient
-          </button>
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-sm border p-6">
-            <div className="flex items-center">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <User className="w-6 h-6 text-[#2596be]" />
-              </div>
-              <div className="ml-4">
-                <p className="text-2xl font-bold text-gray-900">{patients.length}</p>
-                <p className="text-gray-600">Total Patients</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border p-6">
-            <div className="flex items-center">
-              <div className="p-3 bg-green-100 rounded-lg">
-                <User className="w-6 h-6 text-green-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-2xl font-bold text-gray-900">
-                  {patients.filter(p => p.status === 'active').length}
-                </p>
-                <p className="text-gray-600">Active Patients</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border p-6">
-            <div className="flex items-center">
-              <div className="p-3 bg-yellow-100 rounded-lg">
-                <Calendar className="w-6 h-6 text-yellow-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-2xl font-bold text-gray-900">
-                  {patients.filter(p => p.next_appointment).length}
-                </p>
-                <p className="text-gray-600">Upcoming Sessions</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border p-6">
-            <div className="flex items-center">
-              <div className="p-3 bg-purple-100 rounded-lg">
-                <FileText className="w-6 h-6 text-purple-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-2xl font-bold text-gray-900">
-                  {patients.reduce((sum, p) => sum + p.total_sessions, 0)}
-                </p>
-                <p className="text-gray-600">Total Sessions</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className="bg-white rounded-xl shadow-sm border p-6 mb-6">
+        <div className="card-modern border-0 p-6 mb-8">
           <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  placeholder="Search patients by name or email..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2596be] focus:border-transparent"
-                />
-              </div>
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+              <input
+                type="text"
+                placeholder="Search patients by name or email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="input-modern pl-10 w-full"
+              />
             </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Filter className="w-5 h-5 text-gray-400" />
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2596be] focus:border-transparent"
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="input-modern"
+            >
+              <option value="all">All Patients</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="card-modern border-0 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Total Patients</p>
+                <p className="text-2xl font-bold text-foreground">{patients.length}</p>
+              </div>
+              <User className="w-8 h-8 text-[#2596be]" />
+            </div>
+          </div>
+          <div className="card-modern border-0 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Active Patients</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {patients.filter(p => p.total_appointments > 0).length}
+                </p>
+              </div>
+              <Brain className="w-8 h-8 text-green-600" />
+            </div>
+          </div>
+          <div className="card-modern border-0 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">This Month</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {patients.filter(p => {
+                    if (!p.last_appointment) return false;
+                    const lastAppt = new Date(p.last_appointment);
+                    const thisMonth = new Date();
+                    return lastAppt.getMonth() === thisMonth.getMonth() && 
+                           lastAppt.getFullYear() === thisMonth.getFullYear();
+                  }).length}
+                </p>
+              </div>
+              <Calendar className="w-8 h-8 text-purple-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="card-modern border-0 p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-bold text-foreground">Patients</h2>
+            {filteredPatients.length > 0 && (
+              <span className="text-sm text-muted-foreground">
+                {filteredPatients.length} of {patients.length} patients
+              </span>
+            )}
+          </div>
+
+          {filteredPatients.length > 0 ? (
+            <div className="space-y-4">
+              {filteredPatients.map((patient) => (
+                <div 
+                  key={patient.user_id} 
+                  className="border border-white/10 rounded-lg p-4 hover:bg-white/5 transition-colors cursor-pointer"
+                  onClick={() => setSelectedPatient(patient)}
                 >
-                  <option value="all">All Patients</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Patients Table */}
-        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Patient
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Contact
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Next Appointment
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Sessions
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredPatients.map((patient) => (
-                  <tr key={patient.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="w-10 h-10 bg-[#2596be] rounded-full flex items-center justify-center text-white font-semibold">
-                          {patient.name.charAt(0)}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-[#2596be]/10 rounded-lg flex items-center justify-center">
+                        <User className="w-6 h-6 text-[#2596be]" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-foreground">{patient.name}</h3>
+                        <p className="text-sm text-muted-foreground flex items-center gap-1">
+                          <Mail className="w-3 h-3" />
+                          {patient.email}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <div className="text-center">
+                          <p className="text-foreground font-semibold">{patient.total_appointments}</p>
+                          <p>Sessions</p>
                         </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">{patient.name}</div>
-                          <div className="text-sm text-gray-500">{patient.age} years, {patient.gender}</div>
+                        <div className="text-center">
+                          <p className="text-foreground font-semibold">{patient.assessment_count}</p>
+                          <p>Assessments</p>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{patient.email}</div>
-                      <div className="text-sm text-gray-500">{patient.phone}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {formatDate(patient.next_appointment)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{patient.total_sessions}</div>
-                      <div className="text-sm text-gray-500">
-                        Last: {formatDate(patient.last_session)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        patient.status === 'active' 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {patient.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => openPatientModal(patient)}
-                          className="text-[#2596be] hover:text-[#1d7a99]"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button className="text-green-600 hover:text-green-800">
-                          <MessageCircle className="w-4 h-4" />
-                        </button>
-                        <button className="text-blue-600 hover:text-blue-800">
-                          <Calendar className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Patient Detail Modal */}
-        {showPatientModal && selectedPatient && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-bold text-gray-900">Patient Details</h2>
-                  <button
-                    onClick={closePatientModal}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div>
-              
-              <div className="p-6">
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="w-16 h-16 bg-[#2596be] rounded-full flex items-center justify-center text-white text-xl font-bold">
-                    {selectedPatient.name.charAt(0)}
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-900">{selectedPatient.name}</h3>
-                    <p className="text-gray-600">{selectedPatient.age} years, {selectedPatient.gender}</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-3">Contact Information</h4>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Mail className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm">{selectedPatient.email}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Phone className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm">{selectedPatient.phone}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Phone className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm">Emergency: {selectedPatient.emergency_contact}</span>
+                        <div className="text-center">
+                          <p className="text-foreground font-semibold">
+                            {formatDate(patient.last_appointment)}
+                          </p>
+                          <p>Last Visit</p>
+                        </div>
                       </div>
                     </div>
                   </div>
-
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-3">Session Information</h4>
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Total Sessions:</span>
-                        <span className="text-sm font-medium">{selectedPatient.total_sessions}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Status:</span>
-                        <span className={`text-sm font-medium ${
-                          selectedPatient.status === 'active' ? 'text-green-600' : 'text-gray-600'
-                        }`}>
-                          {selectedPatient.status}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Last Session:</span>
-                        <span className="text-sm">{formatDate(selectedPatient.last_session)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Next Session:</span>
-                        <span className="text-sm">{formatDate(selectedPatient.next_appointment)}</span>
-                      </div>
-                    </div>
+                  
+                  <div className="flex justify-end mt-4 gap-2">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/therapist/patients/${patient.user_id}`);
+                      }}
+                      className="flex items-center gap-1 px-3 py-1 text-xs bg-[#2596be]/10 text-[#2596be] rounded-md hover:bg-[#2596be]/20 transition-colors"
+                    >
+                      <Activity className="w-3 h-3" />
+                      Full Records
+                    </button>
+                    <button className="flex items-center gap-1 px-3 py-1 text-xs bg-green-500/10 text-green-600 rounded-md hover:bg-green-500/20 transition-colors">
+                      <MessageCircle className="w-3 h-3" />
+                      Message
+                    </button>
                   </div>
                 </div>
-
-                <div className="mt-6">
-                  <h4 className="font-semibold text-gray-900 mb-3">Clinical Notes</h4>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <p className="text-sm text-gray-700">{selectedPatient.notes}</p>
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-3 mt-6">
-                  <button className="px-4 py-2 bg-[#2596be] text-white rounded-lg hover:bg-[#1d7a99]">
-                    Schedule Session
-                  </button>
-                  <button className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
-                    Send Message
-                  </button>
-                </div>
-              </div>
+              ))}
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="text-center py-12">
+              <User className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-foreground mb-2">No patients found</h3>
+              <p className="text-muted-foreground mb-4">
+                {searchTerm || statusFilter !== 'all' 
+                  ? 'Try adjusting your search or filters' 
+                  : 'You haven\'t added any patients yet'
+                }
+              </p>
+              {!searchTerm && statusFilter === 'all' && (
+                <button className="btn-primary px-6 py-2 flex items-center gap-2 mx-auto">
+                  <Plus className="w-4 h-4" />
+                  Add Your First Patient
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

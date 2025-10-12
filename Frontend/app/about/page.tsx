@@ -3,9 +3,9 @@ import Link from "next/link";
 
 export default function About() {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gradient-modern">
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-[#2596be] to-[#1d7a99] text-white py-20">
+      <section className="bg-gradient-to-br from-primary to-primary-dark text-white py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h1 className="text-4xl md:text-6xl font-bold mb-6">About সই</h1>
@@ -45,20 +45,20 @@ export default function About() {
       </section>
 
       {/* Values Section */}
-      <section className="py-20 bg-gray-50">
+      <section className="py-20 bg-white/50 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Our Core Values</h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">Our Core Values</h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               These principles guide everything we do and shape our commitment to your mental health.
             </p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div className="bg-white p-8 rounded-xl shadow-sm border text-center">
-              <Shield className="w-12 h-12 text-[#2596be] mx-auto mb-4" />
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Privacy & Security</h3>
-              <p className="text-gray-600">
+            <div className="card-modern border-0 p-8 text-center">
+              <Shield className="w-12 h-12 text-primary mx-auto mb-4" />
+              <h3 className="text-xl font-bold text-foreground mb-3">Privacy & Security</h3>
+              <p className="text-muted-foreground">
                 Your personal information and sessions are completely confidential and protected with 
                 industry-standard security measures.
               </p>

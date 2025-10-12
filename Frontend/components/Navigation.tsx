@@ -2,57 +2,31 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { Menu, LogIn, Calendar, User, Settings, LogOut, MessageCircle } from "lucide-react";
+import { useRouter, usePathname } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
+import { Menu, LogIn, Calendar, User, Settings, LogOut, MessageCircle, BookOpen, NotepadText, ArrowLeft } from "lucide-react";
 
 export default function Navigation() {
   const [open, setOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [user, setUser] = useState<any>(null);
-  const [userRole, setUserRole] = useState<string>('user');
+  const { user, logout, isAuthenticated } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
 
-  useEffect(() => {
-    // Check if user is logged in
-    const userData = localStorage.getItem('user');
-    const roleData = localStorage.getItem('userRole');
-    if (userData) {
-      try {
-        setUser(JSON.parse(userData));
-        setUserRole(roleData || 'user');
-      } catch (error) {
-        console.error('Error parsing user data:', error);
-      }
+  // Show back button on all pages except home, login, and register
+  const showBackButton = pathname && pathname !== '/' && pathname !== '/login' && pathname !== '/register';
+
+  const handleBack = () => {
+    // Use window.history to go back
+    if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      // If no history, go to home
+      router.push('/');
     }
-
-    // Listen for storage changes (when user logs in from another tab or page)
-    const handleStorageChange = () => {
-      const userData = localStorage.getItem('user');
-      const roleData = localStorage.getItem('userRole');
-      if (userData) {
-        try {
-          setUser(JSON.parse(userData));
-          setUserRole(roleData || 'user');
-        } catch (error) {
-          console.error('Error parsing user data:', error);
-        }
-      } else {
-        setUser(null);
-        setUserRole('user');
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    
-    // Also listen for custom login event
-    window.addEventListener('userLoggedIn', handleStorageChange);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('userLoggedIn', handleStorageChange);
-    };
-  }, []);
+  };
 
   useEffect(() => {
-    // Close dropdown when clicking outside
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Element;
       if (userMenuOpen && !target.closest('.user-menu-container')) {
@@ -70,200 +44,284 @@ export default function Navigation() {
   }, [userMenuOpen]);
 
   const handleLogout = () => {
-    localStorage.removeItem('user');
-    localStorage.removeItem('userRole');
-    setUser(null);
-    setUserRole('user');
+    logout();
     setUserMenuOpen(false);
     window.location.href = '/';
   };
 
   return (
     <header className="sticky top-0 z-50">
-      {/* <div className="w-full bg-[#2596be] text-white text-center text-sm py-2">
-        Our prices have been updated. Please check the latest rates before booking.
-      </div> */}
-
-      <nav className="bg-[#2596be]/100 backdrop-blur border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-3 bg-[#2596be] text-white sm:px-6 lg:px-8 h-18 flex items-center justify-between">
-          {/* logo */}
-          <Link href="/" className="flex items-center gap-3">
-            <img src="/logo.png" alt="সই" className="w-12 h-12" />
-            <span className="text-xl font-bold text-[White]">সই</span>
-          </Link>
-
-          {/* desktop nav */}
-          <div className="hidden md:flex items-center gap-8 text-[15px]">
-            {/* <Link href="/#for-you" className="hover:text-[#2596be]">For You</Link>
-            <Link href="/#for-specialists" className="hover:text-[#2596be]">For Specialists</Link> */}
-            {/* <Link href="/#services" className="hover:text-[#2596be]">Services</Link> */}
-            {/* <Link href="/#courses" className="hover:text-[#2596be]">Courses</Link> */}
-            <Link href="/#impact" className="hover:text-gray-700">Impact</Link>
-            <Link href="/#experts" className="hover:text-gray-700">Meet our Experts</Link>
-            <Link href="/#blogs" className="hover:text-gray-700">Blogs</Link>
-            <Link href="/#events" className="hover:text-gray-700">News & Events</Link>
-            <Link href="/#tests" className="hover:text-gray-700">Tests & Games</Link>
-            {/* <details className="group relative">
-              <summary className="list-none cursor-pointer hover:text-[#2596be] flex items-center gap-1">
-                More <ChevronRight className="w-4 h-4 transition group-open:rotate-90" />
-              </summary>
-              <div className="absolute right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-lg p-2 w-56">
-                <Link href="/#blogs" className="block px-3 py-2 hover:bg-gray-50">Blogs</Link>
-                <Link href="/#events" className="block px-3 py-2 hover:bg-gray-50">News & Events</Link>
-                <Link href="/#tests" className="block px-3 py-2 hover:bg-gray-50">Tests & Games</Link>
-              </div>
-            </details> */}
-          </div>
-
-          {/* desktop ctas */}
-          <div className="hidden md:flex items-center gap-3">
-            <Link href="/appointments" className="inline-flex items-center gap-2 border border-white text-white px-4 h-10 rounded-xl hover:bg-white/10">
-              <Calendar className="w-4 h-4" /> Book an Appointment
-            </Link>
-            
-            {user ? (
-              <div className="relative user-menu-container">
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setUserMenuOpen(!userMenuOpen);
-                  }}
-                  className="inline-flex items-center gap-2 bg-white text-[#2596be] px-4 h-10 rounded-xl hover:bg-gray-100"
-                >
-                  <div className="w-6 h-6 bg-[#2596be] rounded-full flex items-center justify-center text-white text-sm font-bold">
-                    {user.name?.charAt(0).toUpperCase() || 'U'}
-                  </div>
-                  <span>{user.name}</span>
-                </button>
-                
-                {userMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border py-2 z-50">
-                    {userRole === 'therapist' ? (
-                      // Therapist Menu
-                      <>
-                        <Link 
-                          href="/therapist/dashboard" 
-                          className="block px-4 py-2 text-gray-700 hover:bg-gray-50"
-                          onClick={() => setUserMenuOpen(false)}
-                        >
-                          <div className="flex items-center gap-2">
-                            <User className="w-4 h-4" />
-                            Dashboard
-                          </div>
-                        </Link>
-                        <Link 
-                          href="/therapist/appointments" 
-                          className="block px-4 py-2 text-gray-700 hover:bg-gray-50"
-                          onClick={() => setUserMenuOpen(false)}
-                        >
-                          <div className="flex items-center gap-2">
-                            <Calendar className="w-4 h-4" />
-                            Appointments
-                          </div>
-                        </Link>
-                        <Link 
-                          href="/therapist/patients" 
-                          className="block px-4 py-2 text-gray-700 hover:bg-gray-50"
-                          onClick={() => setUserMenuOpen(false)}
-                        >
-                          <div className="flex items-center gap-2">
-                            <User className="w-4 h-4" />
-                            Patients
-                          </div>
-                        </Link>
-                        <Link 
-                          href="/messages" 
-                          className="block px-4 py-2 text-gray-700 hover:bg-gray-50"
-                          onClick={() => setUserMenuOpen(false)}
-                        >
-                          <div className="flex items-center gap-2">
-                            <MessageCircle className="w-4 h-4" />
-                            Messages
-                          </div>
-                        </Link>
-                        <Link 
-                          href="/therapist/profile" 
-                          className="block px-4 py-2 text-gray-700 hover:bg-gray-50"
-                          onClick={() => setUserMenuOpen(false)}
-                        >
-                          <div className="flex items-center gap-2">
-                            <Settings className="w-4 h-4" />
-                            Profile
-                          </div>
-                        </Link>
-                      </>
-                    ) : (
-                      // User Menu
-                      <>
-                        <Link 
-                          href="/dashboard" 
-                          className="block px-4 py-2 text-gray-700 hover:bg-gray-50"
-                          onClick={() => setUserMenuOpen(false)}
-                        >
-                          <div className="flex items-center gap-2">
-                            <User className="w-4 h-4" />
-                            Dashboard
-                          </div>
-                        </Link>
-                        <Link 
-                          href="/profile" 
-                          className="block px-4 py-2 text-gray-700 hover:bg-gray-50"
-                          onClick={() => setUserMenuOpen(false)}
-                        >
-                          <div className="flex items-center gap-2">
-                            <Settings className="w-4 h-4" />
-                            Profile
-                          </div>
-                        </Link>
-                        <Link 
-                          href="/messages" 
-                          className="block px-4 py-2 text-gray-700 hover:bg-gray-50"
-                          onClick={() => setUserMenuOpen(false)}
-                        >
-                          <div className="flex items-center gap-2">
-                            <MessageCircle className="w-4 h-4" />
-                            Messages
-                          </div>
-                        </Link>
-                        <Link 
-                          href="/appointments/history" 
-                          className="block px-4 py-2 text-gray-700 hover:bg-gray-50"
-                          onClick={() => setUserMenuOpen(false)}
-                        >
-                          <div className="flex items-center gap-2">
-                            <Calendar className="w-4 h-4" />
-                            Appointment History
-                          </div>
-                        </Link>
-                      </>
-                    )}
-                    <hr className="my-2" />
-                    <button 
-                      onClick={handleLogout}
-                      className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50"
-                    >
-                      <div className="flex items-center gap-2">
-                        <LogOut className="w-4 h-4" />
-                        Logout
-                      </div>
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <Link href="/login" className="inline-flex items-center gap-2 bg-[#ffffff] text-[Black] px-4 h-10 rounded-xl hover:bg-[#7CC3DC]">
-                <LogIn className="w-4 h-4 text-[Black]" /> Log in 
-              </Link>
+      <nav className="bg-[#2596be]/95 backdrop-blur-md border-b border-white/10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            {/* Back Button */}
+            {showBackButton && (
+              <button
+                onClick={handleBack}
+                className="flex items-center gap-2 text-white hover:bg-white/10 px-3 py-2 rounded-lg transition-all duration-200"
+                aria-label="Go back"
+              >
+                <ArrowLeft className="w-5 h-5" />
+                <span className="hidden sm:inline">Back</span>
+              </button>
             )}
+            
+            <Link href="/" className="flex items-center gap-3 group">
+              <div className="relative">
+                <img 
+                  src="/4F43E8E1-1786-4A37-93AF-2E381EE3B968.png" 
+                  alt="সই" 
+                  className="w-10 h-10 object-contain transition-transform duration-300 group-hover:scale-110" 
+                />
+                <div className="absolute inset-0 bg-white/20 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-sm"></div>
+              </div>
+              <span className="text-xl font-bold text-white group-hover:text-white/90 transition-colors duration-300">
+                সই
+              </span>
+            </Link>
 
+            <div className="hidden md:flex items-center gap-6">
+              <Link href="/#impact" className="nav-link group">
+                Impact
+              </Link>
+              <Link href="/about" className="nav-link group">
+                About
+              </Link>
+              <Link href="/experts" className="nav-link group">
+                Experts
+              </Link>
+              <Link href="/for-specialists" className="nav-link group">
+                For Specialists
+              </Link>
+              <Link href="/blogs" className="nav-link group">
+                Blogs
+              </Link>
+              <Link href="/resources" className="nav-link group">
+                Resources
+              </Link>
+
+              {/* Book Appointment Button */}
+              <Link
+                href="/appointments"
+                className="inline-flex items-center gap-2 bg-white text-[#2596be] rounded-xl px-5 py-2.5 hover:bg-white/90 transition-all duration-300 group font-semibold text-sm shadow-lg hover:shadow-xl"
+              >
+                <Calendar className="w-4 h-4" />
+                <span>Book Appointment</span>
+              </Link>
+
+              {isAuthenticated ? (
+                <div className="relative user-menu-container">
+                  <button
+                    onClick={() => setUserMenuOpen(!userMenuOpen)}
+                    className="flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-2 text-white hover:bg-white/20 transition-all duration-300 group"
+                  >
+                    <User className="w-4 h-4" />
+                    <span className="hidden lg:block text-sm font-medium">
+                      {user?.name || 'Profile'}
+                    </span>
+                  </button>
+
+                  {userMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-56 bg-white/95 backdrop-blur-md border border-white/20 rounded-xl shadow-2xl overflow-hidden z-50">
+                      <div className="px-4 py-3 border-b border-gray-200/50 bg-gradient-to-r from-[#2596be]/10 to-transparent">
+                        <p className="text-sm font-medium text-gray-800">
+                          {user?.name || 'User'}
+                        </p>
+                        <p className="text-xs text-gray-600 capitalize">
+                          
+                        </p>
+                      </div>
+                      
+                      <div className="py-2">
+                        <Link
+                          href="/profile"
+                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-[#2596be]/10 hover:text-[#2596be] transition-all duration-200"
+                          onClick={() => setUserMenuOpen(false)}
+                        >
+                          <User className="w-4 h-4" />
+                          Profile
+                        </Link>
+                        
+                        <Link
+                          href={user?.role === 'therapist' ? '/therapist/dashboard' : '/dashboard'}
+                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-[#2596be]/10 hover:text-[#2596be] transition-all duration-200"
+                          onClick={() => setUserMenuOpen(false)}
+                        >
+                          <Settings className="w-4 h-4" />
+                          Dashboard
+                        </Link>
+
+                        <Link
+                          href="/messages"
+                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-[#2596be]/10 hover:text-[#2596be] transition-all duration-200"
+                          onClick={() => setUserMenuOpen(false)}
+                        >
+                          <MessageCircle className="w-4 h-4" />
+                          Messages
+                        </Link>
+
+                        {user?.role !== 'therapist' && (
+                          <>
+                            <Link
+                              href="/my-resources"
+                              className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-[#2596be]/10 hover:text-[#2596be] transition-all duration-200"
+                              onClick={() => setUserMenuOpen(false)}
+                            >
+                              <BookOpen className="w-4 h-4" />
+                              My Resources
+                            </Link>
+
+                            <Link
+                              href="/session-notes"
+                              className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-[#2596be]/10 hover:text-[#2596be] transition-all duration-200"
+                              onClick={() => setUserMenuOpen(false)}
+                            >
+                              <NotepadText className="w-4 h-4" />
+                              Session Notes
+                            </Link>
+                          </>
+                        )}
+                        
+                        <hr className="my-2 border-gray-200/50" />
+                        
+                        <button
+                          onClick={handleLogout}
+                          className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-all duration-200"
+                        >
+                          <LogOut className="w-4 h-4" />
+                          Logout
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <Link
+                    href="/login"
+                    className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-2 text-white hover:bg-white/20 transition-all duration-300 group"
+                  >
+                    <LogIn className="w-4 h-4" />
+                    <span className="text-sm font-medium">Login</span>
+                  </Link>
+                  <Link
+                    href="/register"
+                    className="inline-flex items-center gap-2 bg-white text-[#2596be] rounded-xl px-4 py-2 hover:bg-white/90 transition-all duration-300 group font-medium text-sm"
+                  >
+                    Register
+                  </Link>
+                </div>
+              )}
+            </div>
+
+            <div className="md:hidden">
+              <button
+                onClick={() => setOpen(!open)}
+                className="inline-flex items-center justify-center p-2 rounded-xl text-white hover:bg-white/10 focus:outline-none transition-colors duration-200"
+              >
+                <Menu className="w-6 h-6" />
+              </button>
+            </div>
           </div>
-
-          {/* mobile burger */}
-          <button aria-label="menu" className="md:hidden p-2 rounded-lg hover:bg-gray-100" onClick={() => setOpen(!open)}>
-            <Menu className="w-6 h-6" />
-          </button>
-
         </div>
+
+        {open && (
+          <div className="md:hidden bg-[#2596be]/98 backdrop-blur-md border-t border-white/10">
+            <div className="px-4 pt-4 pb-6 space-y-3">
+              <Link href="/#impact" className="block px-3 py-2 text-white hover:bg-white/10 rounded-lg transition-colors duration-200">
+                Impact
+              </Link>
+              <Link href="/about" className="block px-3 py-2 text-white hover:bg-white/10 rounded-lg transition-colors duration-200">
+                About
+              </Link>
+              <Link href="/experts" className="block px-3 py-2 text-white hover:bg-white/10 rounded-lg transition-colors duration-200">
+                Experts
+              </Link>
+              <Link href="/for-specialists" className="block px-3 py-2 text-white hover:bg-white/10 rounded-lg transition-colors duration-200">
+                For Specialists
+              </Link>
+              <Link href="/blogs" className="block px-3 py-2 text-white hover:bg-white/10 rounded-lg transition-colors duration-200">
+                Blogs
+              </Link>
+              <Link href="/resources" className="block px-3 py-2 text-white hover:bg-white/10 rounded-lg transition-colors duration-200">
+                Resources
+              </Link>
+
+              {/* Book Appointment Button for Mobile */}
+              <Link href="/appointments" className="flex items-center gap-2 bg-white text-[#2596be] rounded-lg px-3 py-2.5 hover:bg-white/90 transition-all duration-300 font-semibold text-sm shadow-lg mt-3">
+                <Calendar className="w-4 h-4" />
+                Book Appointment
+              </Link>
+              
+              {isAuthenticated ? (
+                <div className="pt-4 border-t border-white/20 space-y-2">
+                  <div className="px-3 py-2">
+                    <p className="text-sm font-medium text-white/90">
+                      {user?.name || 'User'}
+                    </p>
+                    <p className="text-xs text-white/70 capitalize">
+                      
+
+                    </p>
+                  </div>
+                  
+                  <Link href="/profile" className="flex items-center gap-3 px-3 py-2 text-white hover:bg-white/10 rounded-lg transition-colors duration-200">
+                    <User className="w-4 h-4" />
+                    Profile
+                  </Link>
+                  
+                  <Link href="/dashboard" className="flex items-center gap-3 px-3 py-2 text-white hover:bg-white/10 rounded-lg transition-colors duration-200">
+                    <Settings className="w-4 h-4" />
+                    Dashboard
+                  </Link>
+
+                  <Link href="/messages" className="flex items-center gap-3 px-3 py-2 text-white hover:bg-white/10 rounded-lg transition-colors duration-200">
+                    <MessageCircle className="w-4 h-4" />
+                    Messages
+                  </Link>
+
+                  {user?.role !== 'therapist' && (
+                    <>
+                      <Link href="/my-resources" className="flex items-center gap-3 px-3 py-2 text-white hover:bg-white/10 rounded-lg transition-colors duration-200">
+                        <BookOpen className="w-4 h-4" />
+                        My Resources
+                      </Link>
+
+                      <Link href="/session-notes" className="flex items-center gap-3 px-3 py-2 text-white hover:bg-white/10 rounded-lg transition-colors duration-200">
+                        <NotepadText className="w-4 h-4" />
+                        Session Notes
+                      </Link>
+                    </>
+                  )}
+                  
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-3 w-full px-3 py-2 text-red-300 hover:bg-red-500/20 rounded-lg transition-colors duration-200"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Logout
+                  </button>
+                </div>
+              ) : (
+                <div className="pt-4 border-t border-white/20 space-y-2">
+                  <Link
+                    href="/login"
+                    className="flex items-center gap-3 px-3 py-2 text-white hover:bg-white/10 rounded-lg transition-colors duration-200"
+                  >
+                    <LogIn className="w-4 h-4" />
+                    Login
+                  </Link>
+                  <Link
+                    href="/register"
+                    className="flex items-center gap-3 px-3 py-2 bg-white text-[#2596be] rounded-lg hover:bg-white/90 transition-colors duration-200 font-medium"
+                  >
+                    Register
+                  </Link>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </nav>
     </header>
   );
