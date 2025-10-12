@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
         p.user_id,
         p.appointment_id,
         p.amount,
-        p.payment_status,
+        p.status as payment_status,
         p.payment_method,
         p.transaction_id,
         p.created_at,
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (status) {
-      sql += ` AND p.payment_status = ?`;
+      sql += ` AND p.status = ?`;
       params.push(status);
     }
 
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
 
     // Create payment record
     const result: any = await query(
-      `INSERT INTO payments (user_id, appointment_id, amount, payment_status, payment_method, transaction_id, created_at)
+      `INSERT INTO payments (user_id, appointment_id, amount, status, payment_method, transaction_id, created_at)
        VALUES (?, ?, ?, 'pending', ?, ?, NOW())`,
       [user_id, appointment_id || null, amount, payment_method, transaction_id]
     );

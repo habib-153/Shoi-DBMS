@@ -60,8 +60,32 @@ function PaymentPageContent({
       // Simulate payment processing
       await new Promise(resolve => setTimeout(resolve, 2000));
       
+      let currentPaymentId = paymentId;
+      
+      // If no payment ID exists, create a payment intent first
+      if (!currentPaymentId) {
+        console.log('No payment ID found, creating payment intent...');
+        const paymentIntentResponse = await fetch('/api/payments/intent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            appointment_id: parseInt(resolvedParams.id),
+            user_id: user?.user_id || user?.therapist_id
+          })
+        });
+        
+        const paymentIntentData = await paymentIntentResponse.json();
+        
+        if (!paymentIntentResponse.ok || !paymentIntentData.ok) {
+          throw new Error('Failed to create payment intent');
+        }
+        
+        currentPaymentId = paymentIntentData.payment_id.toString();
+        console.log('Created payment intent with ID:', currentPaymentId);
+      }
+      
       // Update payment status
-      const paymentResponse = await fetch(`/api/payments/${paymentId}`, {
+      const paymentResponse = await fetch(`/api/payments/${currentPaymentId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -73,7 +97,9 @@ function PaymentPageContent({
       });
 
       if (!paymentResponse.ok) {
-        throw new Error('Payment update failed');
+        const errorData = await paymentResponse.json();
+        console.error('Payment update failed:', errorData);
+        throw new Error(errorData.message || 'Payment update failed');
       }
 
       // Update appointment status to paid

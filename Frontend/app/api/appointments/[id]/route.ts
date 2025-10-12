@@ -87,8 +87,8 @@ export async function PATCH(
         const durationMin = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
 
         const sessionResult: any = await query(
-          `INSERT INTO sessions (appointment_id, session_date, duration_min, status)
-           VALUES (?, ?, ?, 'completed')`,
+          `INSERT INTO sessions (appointment_id, session_date, duration_min)
+           VALUES (?, ?, ?)`,
           [appointmentId, sessionDate, durationMin]
         );
 

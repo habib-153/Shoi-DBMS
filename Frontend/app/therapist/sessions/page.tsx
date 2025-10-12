@@ -1,65 +1,62 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { Calendar, Clock, User, FileText, Star, Edit, Save, X, Plus, MessageCircle, ArrowLeft } from "lucide-react";
+import { Calendar, Clock, User, FileText, Edit, Save, Plus, Eye, EyeOff, CheckCircle, X } from "lucide-react";
 
-interface Session {
+interface SessionWithDetails {
   session_id: number;
   appointment_id: number;
   session_date: string;
-  start_time: string;
-  end_time: string;
-  status?: string;
-  notes: string;
   duration_min: number;
-  rating_by_user: number;
-  next_actions: string;
   user_id: number;
   user_name: string;
   user_email: string;
-  therapist_name: string;
-  appointment_status?: string;
+  start_time: string;
+  end_time: string;
+  appointment_status: string;
+  appointment_created_at: string;
+  has_notes: number;
+  note_id: number | null;
+  note_summary: string | null;
 }
 
-interface SessionNote {
-  note_id: number;
-  session_id: number;
-  summary: string;
-  homework: string;
-  therapist_private_notes: string;
-  visible_to_user: boolean;
-  created_at: string;
-  session_date: string;
-  user_name: string;
-}
-
-interface NewSessionNote {
+interface SessionNoteForm {
   summary: string;
   homework: string;
   therapist_private_notes: string;
   visible_to_user: boolean;
 }
 
-export default function TherapistSessions() {
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [sessionNotes, setSessionNotes] = useState<SessionNote[]>([]);
-  const [selectedSession, setSelectedSession] = useState<Session | null>(null);
-  const [showNotesModal, setShowNotesModal] = useState(false);
-  const [showNewNoteModal, setShowNewNoteModal] = useState(false);
-  const [newNote, setNewNote] = useState<NewSessionNote>({
+interface GroupedSessions {
+  [userId: number]: {
+    user_name: string;
+    user_email: string;
+    sessions: SessionWithDetails[];
+  };
+}
+
+export default function TherapistSessionsPage() {
+  const [sessions, setSessions] = useState<SessionWithDetails[]>([]);
+  const [groupedSessions, setGroupedSessions] = useState<GroupedSessions>({});
+  const [selectedSession, setSelectedSession] = useState<SessionWithDetails | null>(null);
+  const [noteForm, setNoteForm] = useState<SessionNoteForm>({
     summary: '',
     homework: '',
     therapist_private_notes: '',
     visible_to_user: true
   });
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [therapist, setTherapist] = useState<any>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [expandedPatients, setExpandedPatients] = useState<Set<number>>(new Set());
 
   useEffect(() => {
-    fetchTherapistData();
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      const user = JSON.parse(userData);
+      setTherapist(user);
+    }
   }, []);
 
   useEffect(() => {
@@ -68,20 +65,35 @@ export default function TherapistSessions() {
     }
   }, [therapist]);
 
-  const fetchTherapistData = async () => {
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      setTherapist(JSON.parse(userData));
-    }
-  };
+  useEffect(() => {
+    // Group sessions by patient
+    const grouped: GroupedSessions = {};
+    sessions.forEach(session => {
+      if (!grouped[session.user_id]) {
+        grouped[session.user_id] = {
+          user_name: session.user_name,
+          user_email: session.user_email,
+          sessions: []
+        };
+      }
+      grouped[session.user_id].sessions.push(session);
+    });
+    setGroupedSessions(grouped);
+    
+    // Auto-expand all patients initially
+    setExpandedPatients(new Set(Object.keys(grouped).map(Number)));
+  }, [sessions]);
 
   const fetchSessions = async () => {
     try {
-      // Use the new therapist-specific sessions endpoint
+      setLoading(true);
+      console.log('Fetching sessions for therapist:', therapist.therapist_id);
       const response = await fetch(`/api/therapist/${therapist.therapist_id}/sessions`);
       const data = await response.json();
+      console.log('Sessions fetch response:', data);
       if (data.success) {
-        setSessions(data.sessions);
+        setSessions(data.sessions || []);
+        console.log('Sessions updated:', data.sessions?.length, 'sessions');
       }
     } catch (error) {
       console.error('Error fetching sessions:', error);
@@ -90,88 +102,107 @@ export default function TherapistSessions() {
     }
   };
 
-  const fetchSessionNotes = async (sessionId: number) => {
-    try {
-      const response = await fetch(`/api/sessions/${sessionId}/notes?userType=therapist`);
-      const data = await response.json();
-      if (data.success) {
-        setSessionNotes(data.notes);
-      }
-    } catch (error) {
-      console.error('Error fetching session notes:', error);
-    }
-  };
-
-  const createSessionNote = async () => {
-    if (!selectedSession) return;
-    if (!therapist?.therapist_id) {
-      alert('Therapist information not found. Please log in again.');
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/sessions/${selectedSession.session_id}/notes`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...newNote,
-          therapist_id: therapist.therapist_id
-        }),
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        fetchSessionNotes(selectedSession.session_id);
-        setNewNote({
+  const handleAddEditNote = async (session: SessionWithDetails) => {
+    setSelectedSession(session);
+    
+    // Check if session has notes (either note_id exists OR has_notes > 0)
+    if (session.note_id || session.has_notes > 0) {
+      try {
+        console.log('Fetching existing note for session:', session.session_id);
+        const response = await fetch(`/api/sessions/${session.session_id}/notes`);
+        const data = await response.json();
+        console.log('Note fetch response:', data);
+        
+        if (data.success && data.notes.length > 0) {
+          const note = data.notes[0];
+          console.log('Loading existing note:', note);
+          setNoteForm({
+            summary: note.summary || '',
+            homework: note.homework || '',
+            therapist_private_notes: note.therapist_private_notes || '',
+            visible_to_user: note.visible_to_user ?? true
+          });
+        } else {
+          console.log('No notes found, creating new note form');
+          setNoteForm({
+            summary: '',
+            homework: '',
+            therapist_private_notes: '',
+            visible_to_user: true
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching note:', error);
+        // If there's an error, still allow creating a new note
+        setNoteForm({
           summary: '',
           homework: '',
           therapist_private_notes: '',
           visible_to_user: true
         });
-        setShowNewNoteModal(false);
-        // Show success message with session details
-        alert(`Note saved successfully!\nPatient: ${data.session_details.user_name}\nSession ID: ${data.session_details.session_id}`);
-      } else {
-        alert('Failed to create session note: ' + data.error);
       }
-    } catch (error) {
-      console.error('Error creating session note:', error);
-      alert('Error creating session note');
-    }
-  };
-
-  const updateSessionStatus = async (sessionId: number, status: string) => {
-    try {
-      const response = await fetch(`/api/sessions/${sessionId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status }),
+    } else {
+      console.log('No existing note, creating new note form');
+      setNoteForm({
+        summary: '',
+        homework: '',
+        therapist_private_notes: '',
+        visible_to_user: true
       });
+    }
+    
+    setShowModal(true);
+  };
 
+  const handleSaveNote = async () => {
+    if (!selectedSession) return;
+    
+    if (!noteForm.summary.trim()) {
+      alert('Please provide at least a session summary');
+      return;
+    }
+
+    setSaving(true);
+    
+    try {
+      console.log('Saving note for session:', selectedSession.session_id, 'with data:', noteForm);
+      
+      const response = await fetch(`/api/sessions/${selectedSession.session_id}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...noteForm,
+          therapist_id: therapist.therapist_id
+        })
+      });
+      
       const data = await response.json();
+      console.log('Save response:', data);
+      
       if (data.success) {
-        fetchSessions();
+        console.log('Note saved successfully, refreshing sessions...');
+        setShowModal(false);
+        await fetchSessions(); // Wait for the fetch to complete
+        console.log('Sessions refreshed');
+      } else {
+        alert('Failed to save note: ' + data.error);
       }
     } catch (error) {
-      console.error('Error updating session status:', error);
+      console.error('Error saving note:', error);
+      alert('Error saving note');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const filteredSessions = sessions.filter(session => {
-    const matchesSearch = session.user_name.toLowerCase().includes(searchTerm.toLowerCase());
-    const sessionStatus = session.status || session.appointment_status || 'completed';
-    const matchesStatus = filterStatus === 'all' || sessionStatus === filterStatus;
-    return matchesSearch && matchesStatus;
-  });
-
-  const handleSessionClick = (session: Session) => {
-    setSelectedSession(session);
-    setShowNotesModal(true);
-    fetchSessionNotes(session.session_id);
+  const togglePatientExpand = (userId: number) => {
+    const newExpanded = new Set(expandedPatients);
+    if (newExpanded.has(userId)) {
+      newExpanded.delete(userId);
+    } else {
+      newExpanded.add(userId);
+    }
+    setExpandedPatients(newExpanded);
   };
 
   const formatDate = (dateString: string) => {
@@ -183,26 +214,12 @@ export default function TherapistSessions() {
   };
 
   const formatTime = (timeString: string) => {
-    return new Date(`1970-01-01T${timeString}`).toLocaleTimeString('en-US', {
+    if (!timeString) return '';
+    return new Date(timeString).toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
       hour12: true
     });
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-green-100 text-green-800';
-      case 'scheduled':
-        return 'bg-blue-100 text-blue-800';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800';
-      case 'in_progress':
-        return 'bg-yellow-100 text-yellow-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
   };
 
   if (loading) {
@@ -216,16 +233,18 @@ export default function TherapistSessions() {
     );
   }
 
+  const totalSessions = sessions.length;
+  const sessionsWithNotes = sessions.filter(s => s.has_notes > 0).length;
+  const sessionsPending = sessions.filter(s => s.has_notes === 0).length;
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Session Management</h1>
-          <p className="text-gray-600">Manage your therapy sessions and session notes</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Sessions</h1>
+          <p className="text-gray-600">Manage therapy sessions and session notes for your patients</p>
         </div>
 
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
             <div className="flex items-center gap-4">
@@ -233,7 +252,7 @@ export default function TherapistSessions() {
                 <Calendar className="w-6 h-6 text-blue-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-gray-900">{sessions.length}</p>
+                <p className="text-2xl font-bold text-gray-900">{totalSessions}</p>
                 <p className="text-sm text-gray-600">Total Sessions</p>
               </div>
             </div>
@@ -241,14 +260,24 @@ export default function TherapistSessions() {
 
           <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <User className="w-6 h-6 text-green-600" />
+              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                <User className="w-6 h-6 text-purple-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-gray-900">
-                  {sessions.filter(s => s.status === 'completed').length}
-                </p>
-                <p className="text-sm text-gray-600">Completed</p>
+                <p className="text-2xl font-bold text-gray-900">{Object.keys(groupedSessions).length}</p>
+                <p className="text-sm text-gray-600">Patients</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                <CheckCircle className="w-6 h-6 text-green-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-gray-900">{sessionsWithNotes}</p>
+                <p className="text-sm text-gray-600">With Notes</p>
               </div>
             </div>
           </div>
@@ -256,362 +285,219 @@ export default function TherapistSessions() {
           <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <Clock className="w-6 h-6 text-yellow-600" />
+                <FileText className="w-6 h-6 text-yellow-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-gray-900">
-                  {sessions.filter(s => s.status === 'scheduled').length}
-                </p>
-                <p className="text-sm text-gray-600">Scheduled</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <Star className="w-6 h-6 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900">
-                  {sessions.filter(s => s.rating_by_user).length > 0 
-                    ? (sessions.filter(s => s.rating_by_user).reduce((acc, s) => acc + s.rating_by_user, 0) / 
-                       sessions.filter(s => s.rating_by_user).length).toFixed(1)
-                    : '0.0'
-                  }
-                </p>
-                <p className="text-sm text-gray-600">Avg Rating</p>
+                <p className="text-2xl font-bold text-gray-900">{sessionsPending}</p>
+                <p className="text-sm text-gray-600">Pending Notes</p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Filters and Search */}
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-6">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <input
-                type="text"
-                placeholder="Search by patient name..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+        <div className="space-y-4">
+          {Object.keys(groupedSessions).length === 0 ? (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+              <FileText className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+              <p className="text-gray-600 text-lg font-medium">No sessions found</p>
+              <p className="text-gray-500 text-sm mt-2">Sessions are created when appointments are completed</p>
             </div>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">All Sessions</option>
-              <option value="scheduled">Scheduled</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-              <option value="in_progress">In Progress</option>
-            </select>
-          </div>
-        </div>
+          ) : (
+            Object.entries(groupedSessions).map(([userId, patientData]) => (
+              <div key={userId} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div 
+                  onClick={() => togglePatientExpand(Number(userId))}
+                  className="p-6 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                      <User className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">{patientData.user_name}</h3>
+                      <p className="text-sm text-gray-600">{patientData.user_email}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-gray-900">{patientData.sessions.length} Sessions</p>
+                      <p className="text-xs text-gray-600">
+                        {patientData.sessions.filter(s => s.has_notes > 0).length} with notes
+                      </p>
+                    </div>
+                    <div className={`transform transition-transform ${expandedPatients.has(Number(userId)) ? 'rotate-90' : ''}`}>
+                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
 
-        {/* Sessions List */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-900">Sessions</h2>
-          </div>
-          <div className="divide-y divide-gray-200">
-            {filteredSessions.map((session) => (
-              <div key={session.session_id} className="p-6 hover:bg-gray-50 cursor-pointer">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-4 mb-2">
-                      <h3 className="font-medium text-gray-900">{session.user_name}</h3>
-                      <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(session.status || session.appointment_status || 'completed')}`}>
-                        {(session.status || session.appointment_status || 'completed').replace('_', ' ')}
-                      </span>
-                      {session.rating_by_user && (
-                        <div className="flex items-center gap-1">
-                          <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                          <span className="text-sm text-gray-600">{session.rating_by_user}/5</span>
+                {expandedPatients.has(Number(userId)) && (
+                  <div className="border-t border-gray-200 bg-gray-50">
+                    {patientData.sessions.map((session) => (
+                      <div key={session.session_id} className="p-6 border-b border-gray-200 last:border-b-0 bg-white hover:bg-gray-50 transition-colors">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-3">
+                              <Calendar className="w-4 h-4 text-gray-400" />
+                              <span className="font-medium text-gray-900">{formatDate(session.session_date)}</span>
+                              <div className="flex items-center gap-2 text-sm text-gray-600">
+                                <Clock className="w-4 h-4" />
+                                {formatTime(session.start_time)} - {formatTime(session.end_time)}
+                              </div>
+                              <span className="text-sm text-gray-600">({session.duration_min} min)</span>
+                              {session.has_notes > 0 ? (
+                                <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full flex items-center gap-1">
+                                  <CheckCircle className="w-3 h-3" />
+                                  Has Note
+                                </span>
+                              ) : (
+                                <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
+                                  No Note
+                                </span>
+                              )}
+                            </div>
+
+                            {session.note_summary && (
+                              <div className="mt-3 p-4 bg-blue-50 rounded-lg border border-blue-100">
+                                <p className="text-sm font-medium text-gray-700 mb-1">Session Summary:</p>
+                                <p className="text-sm text-gray-600">{session.note_summary}</p>
+                              </div>
+                            )}
+                          </div>
+
+                          <button
+                            onClick={() => handleAddEditNote(session)}
+                            className="ml-4 flex items-center gap-2 px-4 py-2 bg-[#2596be] text-white rounded-lg hover:bg-[#1e7a9a] transition-colors flex-shrink-0"
+                          >
+                            {session.has_notes > 0 ? (
+                              <>
+                                <Edit className="w-4 h-4" />
+                                Edit Note
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="w-4 h-4" />
+                                Add Note
+                              </>
+                            )}
+                          </button>
                         </div>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-6 text-sm text-gray-500">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="w-4 h-4" />
-                        <span>{formatDate(session.session_date)}</span>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-4 h-4" />
-                        <span>{formatTime(session.start_time)} - {formatTime(session.end_time)}</span>
-                      </div>
-                      {session.duration_min && (
-                        <span>{session.duration_min} minutes</span>
-                      )}
-                    </div>
-                    {session.notes && (
-                      <div className="mt-2 p-3 bg-gray-50 rounded-lg">
-                        <p className="text-sm text-gray-700">{session.notes}</p>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 ml-4">
-                    {(session.status || session.appointment_status) === 'scheduled' && (
-                      <>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            updateSessionStatus(session.session_id, 'in_progress');
-                          }}
-                          className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-lg hover:bg-yellow-200 text-sm"
-                        >
-                          Start
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            updateSessionStatus(session.session_id, 'completed');
-                          }}
-                          className="px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 text-sm"
-                        >
-                          Complete
-                        </button>
-                      </>
-                    )}
-                    {(session.status || session.appointment_status) === 'in_progress' && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          updateSessionStatus(session.session_id, 'completed');
-                        }}
-                        className="px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 text-sm"
-                      >
-                        Complete
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleSessionClick(session)}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-                    >
-                      <FileText className="w-4 h-4" />
-                    </button>
-                    <button className="p-2 text-gray-500 hover:bg-gray-50 rounded-lg">
-                      <MessageCircle className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Session Notes Modal */}
-        {showNotesModal && selectedSession && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-              <div className="flex justify-between items-center mb-6">
-                <div>
-                  <h3 className="text-xl font-semibold">Session Notes</h3>
-                  <p className="text-gray-600">
-                    {selectedSession.user_name} - {formatDate(selectedSession.session_date)}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      // If note exists, pre-fill; otherwise, start fresh
-                      if (sessionNotes.length > 0) {
-                        const note = sessionNotes[0];
-                        setNewNote({
-                          summary: note.summary || '',
-                          homework: note.homework || '',
-                          therapist_private_notes: note.therapist_private_notes || '',
-                          visible_to_user: note.visible_to_user
-                        });
-                      } else {
-                        setNewNote({
-                          summary: '',
-                          homework: '',
-                          therapist_private_notes: '',
-                          visible_to_user: true
-                        });
-                      }
-                      setShowNewNoteModal(true);
-                    }}
-                    className="flex items-center gap-2 px-4 py-2 bg-[#2596be] text-white rounded-lg hover:bg-[#1e7ba4]"
-                  >
-                    {sessionNotes.length > 0 ? (
-                      <>
-                        <Edit className="w-4 h-4" />
-                        Edit Note
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="w-4 h-4" />
-                        Add Note
-                      </>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => setShowNotesModal(false)}
-                    className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                {sessionNotes.map((note) => (
-                  <div key={note.note_id} className="border border-gray-200 rounded-lg p-4">
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="text-sm text-gray-500">
-                        {new Date(note.created_at).toLocaleString()}
-                      </div>
-                      <div className="flex gap-2 items-center">
-                        <span className={`px-2 py-1 text-xs rounded-full ${
-                          note.visible_to_user ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                        }`}>
-                          {note.visible_to_user ? 'Visible to Patient' : 'Private'}
-                        </span>
-                        <button
-                          onClick={() => {
-                            // Pre-fill the form with existing note data
-                            setNewNote({
-                              summary: note.summary || '',
-                              homework: note.homework || '',
-                              therapist_private_notes: note.therapist_private_notes || '',
-                              visible_to_user: note.visible_to_user
-                            });
-                            setShowNewNoteModal(true);
-                          }}
-                          className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                          title="Edit Note"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                    
-                    {note.summary && (
-                      <div className="mb-3">
-                        <h4 className="font-medium text-gray-900 mb-1">Session Summary</h4>
-                        <p className="text-gray-700">{note.summary}</p>
-                      </div>
-                    )}
-                    
-                    {note.homework && (
-                      <div className="mb-3">
-                        <h4 className="font-medium text-gray-900 mb-1">Homework/Action Items</h4>
-                        <p className="text-gray-700">{note.homework}</p>
-                      </div>
-                    )}
-                    
-                    {note.therapist_private_notes && (
-                      <div className="bg-yellow-50 p-3 rounded-lg">
-                        <h4 className="font-medium text-gray-900 mb-1">Private Notes</h4>
-                        <p className="text-gray-700">{note.therapist_private_notes}</p>
-                      </div>
-                    )}
-                  </div>
-                ))}
-                
-                {sessionNotes.length === 0 && (
-                  <div className="text-center py-8 text-gray-500">
-                    No session notes yet. Add your first note above.
+                    ))}
                   </div>
                 )}
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* New Session Note Modal */}
-        {showNewNoteModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-6 w-full max-w-2xl">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-semibold">
-                  {sessionNotes.length > 0 ? 'Edit Session Note' : 'Add Session Note'}
-                </h3>
-                <button
-                  onClick={() => setShowNewNoteModal(false)}
-                  className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Session Summary
-                  </label>
-                  <textarea
-                    value={newNote.summary}
-                    onChange={(e) => setNewNote({...newNote, summary: e.target.value})}
-                    rows={4}
-                    placeholder="Summarize the session, key topics discussed, patient's progress..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Homework/Action Items
-                  </label>
-                  <textarea
-                    value={newNote.homework}
-                    onChange={(e) => setNewNote({...newNote, homework: e.target.value})}
-                    rows={3}
-                    placeholder="Tasks or exercises for the patient to complete before next session..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Private Notes (Therapist Only)
-                  </label>
-                  <textarea
-                    value={newNote.therapist_private_notes}
-                    onChange={(e) => setNewNote({...newNote, therapist_private_notes: e.target.value})}
-                    rows={3}
-                    placeholder="Private observations, clinical notes, treatment planning notes..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="visible-to-user"
-                    checked={newNote.visible_to_user}
-                    onChange={(e) => setNewNote({...newNote, visible_to_user: e.target.checked})}
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                  />
-                  <label htmlFor="visible-to-user" className="ml-2 text-sm text-gray-700">
-                    Make summary and homework visible to patient
-                  </label>
-                </div>
-              </div>
-
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={createSessionNote}
-                  className="flex-1 bg-[#2596be] text-white py-2 px-4 rounded-lg hover:bg-[#1e7ba4]"
-                >
-                  Save Note
-                </button>
-                <button
-                  onClick={() => setShowNewNoteModal(false)}
-                  className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-300"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+            ))
+          )}
+        </div>
       </div>
+
+      {showModal && selectedSession && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200 sticky top-0 bg-white flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {selectedSession.has_notes > 0 ? 'Edit Session Note' : 'Add Session Note'}
+                </h2>
+                <p className="text-gray-600 mt-1">
+                  {selectedSession.user_name} - {formatDate(selectedSession.session_date)} ({formatTime(selectedSession.start_time)})
+                </p>
+              </div>
+              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Session Summary <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={noteForm.summary}
+                  onChange={(e) => setNoteForm({ ...noteForm, summary: e.target.value })}
+                  rows={4}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2596be] focus:border-transparent"
+                  placeholder="Describe what was discussed in this session..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Homework/Action Items
+                </label>
+                <textarea
+                  value={noteForm.homework}
+                  onChange={(e) => setNoteForm({ ...noteForm, homework: e.target.value })}
+                  rows={3}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2596be] focus:border-transparent"
+                  placeholder="Tasks or exercises for the patient to complete..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Therapist Private Notes
+                </label>
+                <textarea
+                  value={noteForm.therapist_private_notes}
+                  onChange={(e) => setNoteForm({ ...noteForm, therapist_private_notes: e.target.value })}
+                  rows={3}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2596be] focus:border-transparent"
+                  placeholder="Private notes (not visible to patient)..."
+                />
+              </div>
+
+              <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
+                <input
+                  type="checkbox"
+                  id="visible_to_user"
+                  checked={noteForm.visible_to_user}
+                  onChange={(e) => setNoteForm({ ...noteForm, visible_to_user: e.target.checked })}
+                  className="w-5 h-5 text-[#2596be] rounded focus:ring-[#2596be]"
+                />
+                <label htmlFor="visible_to_user" className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                  {noteForm.visible_to_user ? (
+                    <><Eye className="w-4 h-4" /> Visible to Patient</>
+                  ) : (
+                    <><EyeOff className="w-4 h-4" /> Hidden from Patient</>
+                  )}
+                </label>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 flex gap-3 justify-end bg-gray-50 sticky bottom-0">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                disabled={saving}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveNote}
+                disabled={saving}
+                className="flex items-center gap-2 px-6 py-2 bg-[#2596be] text-white rounded-lg hover:bg-[#1e7a9a] transition-colors disabled:opacity-50"
+              >
+                {saving ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Save Note
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
