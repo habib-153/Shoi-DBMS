@@ -41,6 +41,7 @@ function AppointmentHistory() {
     setPayingAppointment(appointmentId);
     
     try {
+      console.log('Creating payment intent for appointment:', appointmentId);
       // Create payment intent for this appointment
       const response = await fetch('/api/payments/intent', {
         method: 'POST',
@@ -52,12 +53,14 @@ function AppointmentHistory() {
       });
       
       const data = await response.json();
+      console.log('Payment intent response:', data);
       
       if (response.ok && data.ok) {
         // Redirect to payment page
         window.location.href = `/pay/${appointmentId}?pid=${data.payment_id}`;
       } else {
-        alert('Failed to create payment. Please try again.');
+        console.error('Payment intent failed:', data);
+        alert(data.error || 'Failed to create payment. Please try again.');
       }
     } catch (error) {
       console.error('Error creating payment:', error);
@@ -295,6 +298,19 @@ function AppointmentHistory() {
                         <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(appointment.status)}`}>
                           {appointment.status}
                         </span>
+                        {/* Payment Status Badge */}
+                        {appointment.payment_status && (
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            appointment.payment_status === 'completed' || appointment.payment_status === 'paid' 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-orange-100 text-orange-800'
+                          }`}>
+                            {appointment.payment_status === 'completed' || appointment.payment_status === 'paid' 
+                              ? 'Paid' 
+                              : 'Payment Pending'
+                            }
+                          </span>
+                        )}
                       </div>
                       <p className="text-gray-600 mb-2">Therapy Session</p>
                       <div className="flex items-center gap-6 text-sm text-gray-500">
@@ -313,39 +329,46 @@ function AppointmentHistory() {
                       </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-lg font-semibold text-gray-900 mb-2">৳{appointment.fees_max || appointment.fees_min || 0}</div>
-                    <div className="flex items-center gap-2">
-                      {appointment.status === 'completed' && (
-                        <>
-                          <button className="p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-50">
-                            <FileText className="w-4 h-4" />
-                          </button>
-                          <button className="p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-50">
-                            <MessageCircle className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
-                      {(appointment.status === 'scheduled' || appointment.status === 'pending_payment') && (
-                        <div className="flex gap-2">
-                          {appointment.payment_status !== 'completed' && appointment.payment_status !== 'paid' && (
-                            appointment.payment_id ? (
+                    <div className="text-right">
+                      <div className="text-lg font-semibold text-gray-900 mb-2">৳{appointment.fees_max || appointment.fees_min || 0}</div>
+                      
+                      {/* Payment status and actions */}
+                      <div className="flex flex-col items-end gap-2">
+                        {/* Show Pay Now button for any appointment with incomplete payment */}
+                        {appointment.payment_status !== 'completed' && appointment.payment_status !== 'paid' && (
+                          <div className="flex gap-2">
+                            {appointment.payment_id ? (
                               <Link 
                                 href={`/pay/${appointment.appointment_id}?pid=${appointment.payment_id}`}
-                                className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+                                className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium"
                               >
-                                Pay Now
+                                Complete Payment
                               </Link>
                             ) : (
                               <button
                                 onClick={() => handlePayNow(appointment.appointment_id)}
                                 disabled={payingAppointment === appointment.appointment_id}
-                                className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 {payingAppointment === appointment.appointment_id ? 'Processing...' : 'Pay Now'}
                               </button>
-                            )
+                            )}
+                          </div>
+                        )}
+                        
+                        {/* Action buttons */}
+                        <div className="flex items-center gap-2">
+                          {appointment.status === 'completed' && (
+                            <>
+                              <button className="p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-50">
+                                <FileText className="w-4 h-4" />
+                              </button>
+                              <button className="p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-50">
+                                <MessageCircle className="w-4 h-4" />
+                              </button>
+                            </>
                           )}
+                          
                           <Link 
                             href={`/appointments/${appointment.appointment_id}`}
                             className="px-3 py-1 bg-[#2596be] text-white rounded-lg hover:bg-[#1d7a99] text-sm"
@@ -353,9 +376,8 @@ function AppointmentHistory() {
                             View Details
                           </Link>
                         </div>
-                      )}
+                      </div>
                     </div>
-                  </div>
                 </div>
                 
               </div>
