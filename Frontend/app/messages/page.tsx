@@ -33,6 +33,7 @@ export default function MessagesPage() {
   });
   const [patientSessions, setPatientSessions] = useState<any[]>([]);
   const [showPatientSessionsModal, setShowPatientSessionsModal] = useState(false);
+  const [selectedSession, setSelectedSession] = useState<any>(null);
   
   // Ref for auto-scrolling messages
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -307,16 +308,43 @@ export default function MessagesPage() {
 
   const fetchPatientSessions = async (userId: number) => {
     try {
-      const response = await fetch(`/api/therapist/sessions/${userId}`);
+      const therapistId = user?.therapist_id;
+      if (!therapistId) {
+        console.error('No therapist ID found');
+        return;
+      }
+
+      // Fetch appointments for THIS therapist and this user
+      const response = await fetch(`/api/therapists/${therapistId}/appointments?userId=${userId}`);
       const data = await response.json();
       
-      if (data.success) {
-        setPatientSessions(data.sessions);
+      if (data.success && data.appointments) {
+        // For each appointment, get its sessions
+        const sessionsPromises = data.appointments.map(async (appointment: any) => {
+          const sessionResponse = await fetch(`/api/appointments/${appointment.appointment_id}/sessions`);
+          const sessionData = await sessionResponse.json();
+          
+          if (sessionData.success && sessionData.sessions) {
+            return sessionData.sessions.map((session: any) => ({
+              ...session,
+              appointment,
+              user_name: appointment.user_name
+            }));
+          }
+          return [];
+        });
+
+        const allSessions = await Promise.all(sessionsPromises);
+        const flatSessions = allSessions.flat();
+        console.log('Loaded sessions for current therapist:', flatSessions);
+        setPatientSessions(flatSessions);
       } else {
         console.error('Failed to fetch patient sessions:', data.error);
+        setPatientSessions([]);
       }
     } catch (error) {
       console.error('Error fetching patient sessions:', error);
+      setPatientSessions([]);
     }
   };
 
@@ -916,6 +944,39 @@ export default function MessagesPage() {
               {/* Create New Session Note */}
               <div className="mb-6 p-4 bg-white/5 rounded-lg border border-white/10">
                 <h3 className="text-lg font-semibold text-foreground mb-4">Create New Session Note</h3>
+                
+                {/* Session Selector */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Select Session <span className="text-red-500">*</span>
+                  </label>
+                  {patientSessions.length > 0 ? (
+                    <select
+                      value={selectedSession?.session_id || ''}
+                      onChange={(e) => {
+                        const session = patientSessions.find(s => s.session_id === parseInt(e.target.value));
+                        setSelectedSession(session);
+                      }}
+                      className="w-full p-3 bg-white/5 border border-white/20 rounded-lg text-foreground focus:border-[#2596be] focus:outline-none"
+                    >
+                      <option value="">-- Select a session --</option>
+                      {patientSessions.map((session) => (
+                        <option key={session.session_id} value={session.session_id}>
+                          Session on {new Date(session.session_date || session.appointment?.start_time).toLocaleDateString()} 
+                          {session.duration_min && ` (${session.duration_min} min)`}
+                          {session.status && ` - ${session.status}`}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-sm text-yellow-800">
+                        No sessions found with this patient. You need to complete a session first.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
@@ -927,6 +988,7 @@ export default function MessagesPage() {
                       placeholder="Brief summary of the session..."
                       className="w-full p-3 bg-white/5 border border-white/20 rounded-lg text-foreground placeholder-muted-foreground focus:border-[#2596be] focus:outline-none resize-none"
                       rows={3}
+                      disabled={!selectedSession}
                     />
                   </div>
                   <div>
@@ -939,6 +1001,7 @@ export default function MessagesPage() {
                       placeholder="Tasks or exercises for the patient..."
                       className="w-full p-3 bg-white/5 border border-white/20 rounded-lg text-foreground placeholder-muted-foreground focus:border-[#2596be] focus:outline-none resize-none"
                       rows={2}
+                      disabled={!selectedSession}
                     />
                   </div>
                   <div>
@@ -951,6 +1014,7 @@ export default function MessagesPage() {
                       placeholder="Private observations and notes..."
                       className="w-full p-3 bg-white/5 border border-white/20 rounded-lg text-foreground placeholder-muted-foreground focus:border-[#2596be] focus:outline-none resize-none"
                       rows={2}
+                      disabled={!selectedSession}
                     />
                   </div>
                   <div className="flex items-center gap-2">
@@ -960,6 +1024,7 @@ export default function MessagesPage() {
                       checked={newSessionNote.visible_to_user}
                       onChange={(e) => setNewSessionNote(prev => ({ ...prev, visible_to_user: e.target.checked }))}
                       className="rounded border-white/20 text-[#2596be] focus:ring-[#2596be]"
+                      disabled={!selectedSession}
                     />
                     <label htmlFor="visible_to_user" className="text-sm text-foreground">
                       Make summary and homework visible to patient
@@ -968,36 +1033,40 @@ export default function MessagesPage() {
                   <Button 
                     onClick={async () => {
                       try {
+                        if (!selectedSession) {
+                          alert('Please select a session first');
+                          return;
+                        }
+
                         const userId = selectedConversation?.user_id || selectedConversation?.contact_id;
                         if (!userId || !user?.therapist_id) {
                           alert('Missing user or therapist information');
                           return;
                         }
 
-                        console.log('Creating session note for user:', userId);
+                        console.log('Creating session note for session:', selectedSession.session_id);
                         
-                        // First, ensure we have a test session
-                        const sessionResponse = await fetch('/api/create-test-session', {
-                          method: 'POST'
-                        });
+                        // Use the selected session ID
+                        const noteCreated = await createSessionNote(selectedSession.session_id);
                         
-                        if (sessionResponse.ok) {
-                          const sessionData = await sessionResponse.json();
-                          console.log('Session data:', sessionData);
+                        if (noteCreated) {
+                          alert('Session note created successfully!');
                           
-                          // Use session ID 1 (or the created session)
-                          const sessionId = sessionData.sessionId || 1;
-                          const noteCreated = await createSessionNote(sessionId);
+                          // Reset form
+                          setNewSessionNote({
+                            summary: '',
+                            homework: '',
+                            therapist_private_notes: '',
+                            visible_to_user: true
+                          });
+                          setSelectedSession(null);
                           
-                          if (noteCreated) {
-                            alert('Session note created successfully!');
-                            
-                            // Send message to patient
-                            await fetch('/api/messages', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({
-                                sender_type: 'therapist',
+                          // Send message to patient
+                          await fetch('/api/messages', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              sender_type: 'therapist',
                                 sender_id: user.therapist_id,
                                 receiver_type: 'user',
                                 receiver_id: parseInt(userId.toString()),
@@ -1021,15 +1090,12 @@ export default function MessagesPage() {
                           } else {
                             alert('Failed to create session note');
                           }
-                        } else {
-                          alert('Failed to create session');
-                        }
                       } catch (error) {
                         console.error('Error creating session note:', error);
                         alert('Failed to create session note: ' + error);
                       }
                     }}
-                    disabled={!newSessionNote.summary.trim()}
+                    disabled={!selectedSession || !newSessionNote.summary.trim()}
                     className="btn-primary"
                   >
                     <Plus className="h-4 w-4 mr-2" />

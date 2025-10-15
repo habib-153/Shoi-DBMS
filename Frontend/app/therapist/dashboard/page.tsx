@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Calendar, Clock, User, DollarSign, TrendingUp, MessageCircle, Settings, Star, Users, FileText } from "lucide-react";
+import { Calendar, Clock, User, DollarSign, TrendingUp, MessageCircle, Settings, Star, Users, FileText, UserPlus } from "lucide-react";
 
 interface Appointment {
   appointment_id: number;
@@ -20,6 +20,12 @@ interface TherapistStats {
   weeklyRevenue: number;
   averageRating: number;
   completedSessions: number;
+}
+
+interface ReferralStats {
+  pending: number;
+  accepted: number;
+  total: number;
 }
 
 interface SessionNote {
@@ -43,6 +49,7 @@ export default function TherapistDashboard() {
   });
   const [sessionNotes, setSessionNotes] = useState<SessionNote[]>([]);
   const [upcomingAppointments, setUpcomingAppointments] = useState<Appointment[]>([]);
+  const [referralStats, setReferralStats] = useState<ReferralStats>({ pending: 0, accepted: 0, total: 0 });
   const [loading, setLoading] = useState(true);
   const [therapist, setTherapist] = useState<any>(null);
   const [isClient, setIsClient] = useState(false);
@@ -68,7 +75,8 @@ export default function TherapistDashboard() {
       fetchTodayAppointments(),
       fetchStats(),
       fetchSessionNotes(),
-      fetchUpcomingAppointments()
+      fetchUpcomingAppointments(),
+      fetchReferralStats()
     ]);
   };
 
@@ -148,15 +156,75 @@ export default function TherapistDashboard() {
 
   const fetchUpcomingAppointments = async () => {
     try {
-      if (typeof window !== 'undefined' && therapist?.therapist_id) {
-        const response = await fetch(`/api/therapists/${therapist.therapist_id}/appointments?status=confirmed,pending`);
+      if (typeof window !== 'undefined') {
+        console.log('=== UPCOMING APPOINTMENTS DEBUG ===');
+        console.log('Therapist object:', therapist);
+        console.log('Therapist ID:', therapist?.therapist_id);
+        
+        if (!therapist?.therapist_id) {
+          console.error('No therapist_id found!');
+          console.log('LocalStorage therapist:', localStorage.getItem('therapist'));
+          console.log('LocalStorage user:', localStorage.getItem('user'));
+          return;
+        }
+        
+        const url = `/api/therapists/${therapist.therapist_id}/appointments?status=confirmed,pending,scheduled`;
+        console.log('Fetching URL:', url);
+        
+        const response = await fetch(url);
+        console.log('Response status:', response.status);
+        
         const data = await response.json();
+        console.log('Full API response:', JSON.stringify(data, null, 2));
+        
         if (data.success) {
-          setUpcomingAppointments(data.appointments?.slice(0, 5) || []);
+          console.log('Total appointments returned:', data.appointments?.length || 0);
+          
+          // Filter for future appointments only
+          const now = new Date();
+          console.log('Current time:', now.toISOString());
+          
+          const futureAppointments = (data.appointments || [])
+            .filter((apt: Appointment) => {
+              const aptTime = new Date(apt.start_time);
+              console.log(`Appointment ${apt.appointment_id}: ${apt.start_time} (${aptTime.toISOString()}) - Future: ${aptTime > now}`);
+              return aptTime > now;
+            })
+            .slice(0, 5);
+          
+          console.log('Filtered upcoming appointments:', futureAppointments.length);
+          setUpcomingAppointments(futureAppointments);
+        } else {
+          console.error('API returned error:', data.error);
         }
       }
     } catch (error) {
       console.error('Error fetching upcoming appointments:', error);
+    }
+  };
+
+  const fetchReferralStats = async () => {
+    try {
+      if (typeof window !== 'undefined' && therapist?.therapist_id) {
+        // Fetch both sent and received referrals
+        const [sentResponse, receivedResponse] = await Promise.all([
+          fetch(`/api/therapists/${therapist.therapist_id}/referrals?type=sent`),
+          fetch(`/api/therapists/${therapist.therapist_id}/referrals?type=received`)
+        ]);
+        
+        const sentData = await sentResponse.json();
+        const receivedData = await receivedResponse.json();
+        
+        if (sentData.success && receivedData.success) {
+          setReferralStats({
+            pending: (sentData.stats?.pending || 0) + (receivedData.stats?.pending || 0),
+            accepted: (sentData.stats?.accepted || 0) + (receivedData.stats?.accepted || 0),
+            total: (sentData.stats?.total || 0) + (receivedData.stats?.total || 0)
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching referral stats:', error);
     }
   };
 
@@ -282,19 +350,20 @@ export default function TherapistDashboard() {
             </div>
           </div>
           
-          <div className="card-modern border-0 p-6">
+          <Link href="/therapist/referrals" className="card-modern border-0 p-6 hover:shadow-lg transition-shadow cursor-pointer bg-gradient-to-br from-orange-50 to-orange-100">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Completed Sessions</p>
-                <p className="text-2xl font-bold text-foreground">{stats.completedSessions}</p>
+                <p className="text-sm text-orange-700 font-medium">Pending Referrals</p>
+                <p className="text-2xl font-bold text-orange-900">{referralStats.pending}</p>
+                <p className="text-xs text-orange-600 mt-1">{referralStats.total} total</p>
               </div>
-              <TrendingUp className="w-8 h-8 text-indigo-600" />
+              <UserPlus className="w-8 h-8 text-orange-600" />
             </div>
-          </div>
+          </Link>
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           <Link href="/therapist/appointments" className="bg-[#2596be] text-white p-6 rounded-xl hover:bg-[#1d7a99] transition-colors">
             <Calendar className="w-8 h-8 mb-3" />
             <h3 className="font-semibold text-lg">Manage Appointments</h3>
@@ -307,10 +376,16 @@ export default function TherapistDashboard() {
             <p className="text-muted-foreground text-sm">Access patient information</p>
           </Link>
           
-                    <Link href="/therapist/sessions" className="card-modern border-0 p-6 hover:shadow-md transition-shadow group">
-            <FileText className="w-8 h-8 text-blue-600 mb-3" />
+          <Link href="/therapist/sessions" className="card-modern border-0 p-6 hover:shadow-md transition-shadow group">
+            <FileText className="w-8 h-8 text-blue-600 mb-3 group-hover:scale-110 transition-transform" />
             <h3 className="font-semibold text-lg text-foreground">Sessions</h3>
             <p className="text-muted-foreground text-sm">Manage therapy sessions and notes</p>
+          </Link>
+
+          <Link href="/therapist/referrals" className="card-modern border-0 p-6 hover:shadow-md transition-shadow group bg-gradient-to-br from-orange-50 to-orange-100">
+            <UserPlus className="w-8 h-8 text-orange-600 mb-3 group-hover:scale-110 transition-transform" />
+            <h3 className="font-semibold text-lg text-foreground">Referrals</h3>
+            <p className="text-muted-foreground text-sm">Patient psychiatric referrals</p>
           </Link>
           
           <Link href="/messages" className="card-modern border-0 p-6 hover:shadow-md transition-shadow group">
@@ -406,9 +481,7 @@ export default function TherapistDashboard() {
             ) : (
               <div className="text-center py-8">
                 <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-                              ) : (
                 <p className="text-muted-foreground">No sessions yet</p>
-              )}
               </div>
             )}
           </div>

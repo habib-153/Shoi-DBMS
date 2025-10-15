@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Menu, LogIn, Calendar, User, Settings, LogOut, MessageCircle, BookOpen, NotepadText, ArrowLeft } from "lucide-react";
+import NotificationBell from "./NotificationBell";
 
 export default function Navigation() {
   const [open, setOpen] = useState(false);
@@ -110,16 +111,25 @@ export default function Navigation() {
               </Link>
 
               {isAuthenticated ? (
-                <div className="relative user-menu-container">
-                  <button
-                    onClick={() => setUserMenuOpen(!userMenuOpen)}
-                    className="flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-2 text-white hover:bg-white/20 transition-all duration-300 group"
-                  >
-                    <User className="w-4 h-4" />
-                    <span className="hidden lg:block text-sm font-medium">
-                      {user?.name || 'Profile'}
-                    </span>
-                  </button>
+                <div className="flex items-center gap-2">
+                  {/* Notification Bell */}
+                  {user && (user.therapist_id || user.user_id) && (
+                    <NotificationBell 
+                      userType={user.role === 'therapist' ? 'therapist' : 'user'}
+                      userId={(user.role === 'therapist' ? user.therapist_id : user.user_id) || 0}
+                    />
+                  )}
+                  
+                  <div className="relative user-menu-container">
+                    <button
+                      onClick={() => setUserMenuOpen(!userMenuOpen)}
+                      className="flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-2 text-white hover:bg-white/20 transition-all duration-300 group"
+                    >
+                      <User className="w-4 h-4" />
+                      <span className="hidden lg:block text-sm font-medium">
+                        {user?.name || 'Profile'}
+                      </span>
+                    </button>
 
                   {userMenuOpen && (
                     <div className="absolute right-0 mt-2 w-56 bg-white/95 backdrop-blur-md border border-white/20 rounded-xl shadow-2xl overflow-hidden z-50">
@@ -194,6 +204,7 @@ export default function Navigation() {
                       </div>
                     </div>
                   )}
+                  </div>
                 </div>
               ) : (
                 <div className="flex items-center gap-3">
