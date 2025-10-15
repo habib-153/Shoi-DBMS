@@ -25,9 +25,16 @@ const pool = mysql.createPool({
   idleTimeout: 60000,
 });
 
-export async function query<T = any>(sql: string, params: any[] = []): Promise<T[]> {
+export async function query<T = any>(sql: string, params: any[] = []): Promise<T[] | any> {
   try {
     const [rows] = await pool.execute(sql, params);
+    
+    // For INSERT/UPDATE/DELETE, return the result object with insertId, affectedRows, etc.
+    if (rows && typeof rows === 'object' && 'insertId' in rows) {
+      return rows;
+    }
+    
+    // For SELECT queries, return the rows array
     return Array.isArray(rows) ? rows as T[] : [rows] as T[];
   } catch (error) {
     console.error('Database query error:', error);

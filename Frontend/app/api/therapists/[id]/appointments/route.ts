@@ -44,8 +44,11 @@ export async function GET(
     const params_array: any[] = [therapistId];
 
     if (status) {
-      sql += ` AND a.status = ?`;
-      params_array.push(status);
+      // Handle comma-separated status values (e.g., "confirmed,pending")
+      const statusValues = status.split(',').map(s => s.trim());
+      const placeholders = statusValues.map(() => '?').join(',');
+      sql += ` AND a.status IN (${placeholders})`;
+      params_array.push(...statusValues);
     }
 
     if (date) {
@@ -56,6 +59,11 @@ export async function GET(
     if (userId) {
       sql += ` AND a.user_id = ?`;
       params_array.push(userId);
+    }
+
+    // Only show future or today's appointments for upcoming view
+    if (!date) {
+      sql += ` AND a.start_time >= CURDATE()`;
     }
 
     sql += ` ORDER BY a.start_time ASC`;

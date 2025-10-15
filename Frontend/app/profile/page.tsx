@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { useRouter } from "next/navigation";
 import { User, Mail, Phone, Calendar, MapPin, Edit, Save, X, Camera, Shield, Award, Clock, BookOpen, Heart } from "lucide-react";
 
 interface UserProfile {
@@ -31,6 +32,7 @@ interface UserProfile {
 
 export default function Profile() {
   const { user: authUser, isLoading: authLoading } = useAuth();
+  const router = useRouter();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedUser, setEditedUser] = useState<UserProfile | null>(null);
@@ -625,30 +627,48 @@ export default function Profile() {
               <div className="space-y-3">
                 {isTherapist() ? (
                   <>
-                    <button className="w-full flex items-center gap-3 p-3 text-left hover:bg-gray-50 rounded-lg">
+                    <button 
+                      onClick={() => router.push('/therapist/schedule')}
+                      className="w-full flex items-center gap-3 p-3 text-left hover:bg-gray-50 rounded-lg transition-colors"
+                    >
                       <Calendar className="w-5 h-5 text-gray-400" />
                       <span>Manage Schedule</span>
                     </button>
-                    <button className="w-full flex items-center gap-3 p-3 text-left hover:bg-gray-50 rounded-lg">
+                    <button 
+                      onClick={() => router.push('/therapist/patients')}
+                      className="w-full flex items-center gap-3 p-3 text-left hover:bg-gray-50 rounded-lg transition-colors"
+                    >
                       <User className="w-5 h-5 text-gray-400" />
                       <span>View Patients</span>
                     </button>
-                    <button className="w-full flex items-center gap-3 p-3 text-left hover:bg-gray-50 rounded-lg">
+                    <button 
+                      onClick={() => router.push('/therapist/certifications')}
+                      className="w-full flex items-center gap-3 p-3 text-left hover:bg-gray-50 rounded-lg transition-colors"
+                    >
                       <Award className="w-5 h-5 text-gray-400" />
                       <span>Certifications</span>
                     </button>
                   </>
                 ) : (
                   <>
-                    <button className="w-full flex items-center gap-3 p-3 text-left hover:bg-gray-50 rounded-lg">
+                    <button 
+                      onClick={() => router.push('/appointments')}
+                      className="w-full flex items-center gap-3 p-3 text-left hover:bg-gray-50 rounded-lg transition-colors"
+                    >
                       <Calendar className="w-5 h-5 text-gray-400" />
                       <span>Book Appointment</span>
                     </button>
-                    <button className="w-full flex items-center gap-3 p-3 text-left hover:bg-gray-50 rounded-lg">
+                    <button 
+                      onClick={() => router.push('/therapists')}
+                      className="w-full flex items-center gap-3 p-3 text-left hover:bg-gray-50 rounded-lg transition-colors"
+                    >
                       <User className="w-5 h-5 text-gray-400" />
                       <span>Find Therapists</span>
                     </button>
-                    <button className="w-full flex items-center gap-3 p-3 text-left hover:bg-gray-50 rounded-lg">
+                    <button 
+                      onClick={() => router.push('/privacy-settings')}
+                      className="w-full flex items-center gap-3 p-3 text-left hover:bg-gray-50 rounded-lg transition-colors"
+                    >
                       <Shield className="w-5 h-5 text-gray-400" />
                       <span>Privacy Settings</span>
                     </button>
