@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Calendar, Clock, User, FileText, Edit, Save, Plus, Eye, EyeOff, CheckCircle, X } from "lucide-react";
+import { Calendar, Clock, User, FileText, Edit, Save, Plus, Eye, EyeOff, CheckCircle, X, UserPlus, AlertTriangle } from "lucide-react";
 
 interface SessionWithDetails {
   session_id: number;
@@ -27,6 +27,15 @@ interface SessionNoteForm {
   visible_to_user: boolean;
 }
 
+interface ReferralForm {
+  referred_to_therapist_id: number | null;
+  reason: string;
+  severity_level: 'severe' | 'critical';
+  symptoms: string;
+  current_medication: string;
+  additional_notes: string;
+}
+
 interface GroupedSessions {
   [userId: number]: {
     user_name: string;
@@ -49,7 +58,18 @@ export default function TherapistSessionsPage() {
   const [saving, setSaving] = useState(false);
   const [therapist, setTherapist] = useState<any>(null);
   const [showModal, setShowModal] = useState(false);
+  const [showReferralModal, setShowReferralModal] = useState(false);
   const [expandedPatients, setExpandedPatients] = useState<Set<number>>(new Set());
+  const [psychiatrists, setPsychiatrists] = useState<any[]>([]);
+  const [referralForm, setReferralForm] = useState<ReferralForm>({
+    referred_to_therapist_id: null,
+    reason: '',
+    severity_level: 'severe',
+    symptoms: '',
+    current_medication: '',
+    additional_notes: ''
+  });
+  const [submittingReferral, setSubmittingReferral] = useState(false);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -99,6 +119,29 @@ export default function TherapistSessionsPage() {
       console.error('Error fetching sessions:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPsychiatrists = async () => {
+    try {
+      console.log('=== FETCHING PSYCHIATRISTS ===');
+      const response = await fetch('/api/psychiatrists');
+      console.log('Response status:', response.status);
+      
+      const data = await response.json();
+      console.log('Psychiatrists API response:', data);
+      
+      if (data.success) {
+        console.log('Number of psychiatrists found:', data.psychiatrists?.length || 0);
+        console.log('Psychiatrists:', data.psychiatrists);
+        setPsychiatrists(data.psychiatrists || []);
+      } else {
+        console.error('API returned error:', data.error);
+        setPsychiatrists([]);
+      }
+    } catch (error) {
+      console.error('Error fetching psychiatrists:', error);
+      setPsychiatrists([]);
     }
   };
 
@@ -192,6 +235,65 @@ export default function TherapistSessionsPage() {
       alert('Error saving note');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleOpenReferral = () => {
+    // Reset referral form
+    setReferralForm({
+      referred_to_therapist_id: null,
+      reason: '',
+      severity_level: 'severe',
+      symptoms: '',
+      current_medication: '',
+      additional_notes: ''
+    });
+    fetchPsychiatrists();
+    setShowReferralModal(true);
+  };
+
+  const handleSubmitReferral = async () => {
+    if (!selectedSession) return;
+    
+    if (!referralForm.reason.trim()) {
+      alert('Please provide a reason for the referral');
+      return;
+    }
+
+    if (!referralForm.referred_to_therapist_id) {
+      alert('Please select a psychiatrist to refer to');
+      return;
+    }
+
+    setSubmittingReferral(true);
+    
+    try {
+      const response = await fetch('/api/referrals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: selectedSession.user_id,
+          referring_therapist_id: therapist.therapist_id,
+          session_id: selectedSession.session_id,
+          ...referralForm
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        alert(`Referral created successfully for ${selectedSession.user_name}`);
+        setShowReferralModal(false);
+        // Optionally close the main modal too
+        // setShowModal(false);
+      } else {
+        alert('Failed to create referral: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Error creating referral:', error);
+      alert('Error creating referral');
+    } finally {
+      setSubmittingReferral(false);
     }
   };
 
@@ -469,28 +571,206 @@ export default function TherapistSessionsPage() {
               </div>
             </div>
 
+            <div className="p-6 border-t border-gray-200 flex gap-3 justify-between bg-gray-50 sticky bottom-0">
+              <button
+                onClick={handleOpenReferral}
+                className="flex items-center gap-2 px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+                disabled={saving}
+              >
+                <UserPlus className="w-4 h-4" />
+                Refer to Psychiatrist
+              </button>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  disabled={saving}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveNote}
+                  disabled={saving}
+                  className="flex items-center gap-2 px-6 py-2 bg-[#2596be] text-white rounded-lg hover:bg-[#1e7a9a] transition-colors disabled:opacity-50"
+                >
+                  {saving ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      Save Note
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Referral Modal */}
+      {showReferralModal && selectedSession && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200 sticky top-0 bg-white flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                  <AlertTriangle className="w-6 h-6 text-orange-600" />
+                  Refer Patient to Psychiatrist
+                </h2>
+                <p className="text-gray-600 mt-1">
+                  {selectedSession.user_name} - Session on {formatDate(selectedSession.session_date)}
+                </p>
+              </div>
+              <button onClick={() => setShowReferralModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Select Psychiatrist */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Psychiatrist <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={referralForm.referred_to_therapist_id || ''}
+                  onChange={(e) => setReferralForm({ ...referralForm, referred_to_therapist_id: Number(e.target.value) || null })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  required
+                >
+                  <option value="">-- Choose a Psychiatrist --</option>
+                  {psychiatrists.map((psych) => (
+                    <option key={psych.therapist_id} value={psych.therapist_id}>
+                      {psych.name} - {psych.email}
+                    </option>
+                  ))}
+                </select>
+                {psychiatrists.length === 0 && (
+                  <p className="mt-2 text-sm text-amber-600">
+                    No psychiatrists available. Please contact admin.
+                  </p>
+                )}
+              </div>
+
+              {/* Severity Level */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Severity Level <span className="text-red-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  {['severe', 'critical'].map((level) => (
+                    <button
+                      key={level}
+                      onClick={() => setReferralForm({ ...referralForm, severity_level: level as any })}
+                      className={`px-4 py-3 border-2 rounded-lg text-sm font-medium transition-all ${
+                        referralForm.severity_level === level
+                          ? level === 'critical'
+                            ? 'border-red-600 bg-red-50 text-red-900'
+                            : 'border-orange-600 bg-orange-50 text-orange-900'
+                          : 'border-gray-300 hover:border-gray-400'
+                      }`}
+                    >
+                      {level.charAt(0).toUpperCase() + level.slice(1)}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-gray-500">
+                  Only severe or critical cases can be referred to psychiatrists
+                </p>
+              </div>
+
+              {/* Reason for Referral */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Reason for Psychiatric Referral <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={referralForm.reason}
+                  onChange={(e) => setReferralForm({ ...referralForm, reason: e.target.value })}
+                  rows={4}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  placeholder="Explain why psychiatric intervention is needed (e.g., severe symptoms, medication evaluation required, risk assessment needed)..."
+                />
+              </div>
+
+              {/* Symptoms */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Observed Symptoms
+                </label>
+                <textarea
+                  value={referralForm.symptoms}
+                  onChange={(e) => setReferralForm({ ...referralForm, symptoms: e.target.value })}
+                  rows={3}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  placeholder="List specific symptoms observed (e.g., persistent depression, suicidal ideation, severe anxiety, psychotic symptoms)..."
+                />
+              </div>
+
+              {/* Current Medication */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Current Medication
+                </label>
+                <textarea
+                  value={referralForm.current_medication}
+                  onChange={(e) => setReferralForm({ ...referralForm, current_medication: e.target.value })}
+                  rows={2}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  placeholder="List any current medications or write 'None'..."
+                />
+              </div>
+
+              {/* Additional Notes */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Additional Notes
+                </label>
+                <textarea
+                  value={referralForm.additional_notes}
+                  onChange={(e) => setReferralForm({ ...referralForm, additional_notes: e.target.value })}
+                  rows={3}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  placeholder="Any other relevant information for the psychiatrist..."
+                />
+              </div>
+
+              {/* Information Box */}
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>Note:</strong> This referral will be sent to the selected psychiatrist. 
+                  The patient will be notified and can schedule an appointment if the psychiatrist accepts.
+                </p>
+              </div>
+            </div>
+
             <div className="p-6 border-t border-gray-200 flex gap-3 justify-end bg-gray-50 sticky bottom-0">
               <button
-                onClick={() => setShowModal(false)}
+                onClick={() => setShowReferralModal(false)}
                 className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                disabled={saving}
+                disabled={submittingReferral}
               >
                 Cancel
               </button>
               <button
-                onClick={handleSaveNote}
-                disabled={saving}
-                className="flex items-center gap-2 px-6 py-2 bg-[#2596be] text-white rounded-lg hover:bg-[#1e7a9a] transition-colors disabled:opacity-50"
+                onClick={handleSubmitReferral}
+                disabled={submittingReferral || !referralForm.reason.trim() || !referralForm.referred_to_therapist_id}
+                className="flex items-center gap-2 px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50"
               >
-                {saving ? (
+                {submittingReferral ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    Saving...
+                    Submitting...
                   </>
                 ) : (
                   <>
-                    <Save className="w-4 h-4" />
-                    Save Note
+                    <UserPlus className="w-4 h-4" />
+                    Submit Referral
                   </>
                 )}
               </button>

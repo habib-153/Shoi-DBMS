@@ -226,3 +226,16 @@ interface SessionNote {
 6. Test with different therapist IDs
 7. Check loading states
 8. Verify date formatting in different timezones
+
+
+---
+
+## Latest Update: Referrals Integration (October 14, 2025)
+
+### Added to Dashboard:
+- Pending Referrals stat card (orange gradient, clickable)
+- Referrals Quick Action card
+- Real-time referral counts from API
+- Direct navigation to /therapist/referrals
+
+The dashboard now shows pending referrals prominently with orange highlighting!

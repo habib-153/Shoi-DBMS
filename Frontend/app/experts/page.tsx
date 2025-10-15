@@ -38,10 +38,28 @@ export default function Experts() {
       try {
         setLoading(true);
         const response = await fetch('/api/therapists');
+        
         if (!response.ok) {
-          throw new Error('Failed to fetch therapists');
+          const errorData = await response.json().catch(() => ({}));
+          console.error('API Error:', errorData);
+          throw new Error(errorData.details || errorData.error || 'Failed to fetch therapists');
         }
+        
         const data = await response.json();
+        
+        // Check if we got an error response
+        if (data.error) {
+          throw new Error(data.details || data.error);
+        }
+        
+        // Handle empty data
+        if (!Array.isArray(data) || data.length === 0) {
+          console.warn('No therapists found in database');
+          setTherapists([]);
+          setFilteredTherapists([]);
+          setError('No therapists available at the moment. Please check back later.');
+          return;
+        }
         
         // Group therapists by id and collect their specialties
         const therapistsMap = new Map<number, Therapist>();
@@ -72,8 +90,9 @@ export default function Experts() {
         setTherapists(therapistsArray);
         setFilteredTherapists(therapistsArray);
         setError(null);
-      } catch (err) {
-        setError('Failed to load therapists');
+      } catch (err: any) {
+        const errorMessage = err.message || 'Failed to load therapists. Please check your database connection.';
+        setError(errorMessage);
         console.error('Error fetching therapists:', err);
       } finally {
         setLoading(false);
@@ -127,15 +146,34 @@ export default function Experts() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">{error}</p>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="bg-[#2596be] text-white px-4 py-2 rounded-lg hover:bg-[#1d7a99] transition-colors"
-          >
-            Try Again
-          </button>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <div className="bg-white rounded-xl shadow-lg p-8">
+            <div className="mb-4">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Unable to Load Therapists</h2>
+              <p className="text-red-600 mb-4">{error}</p>
+              <div className="text-sm text-gray-600 mb-6 text-left bg-gray-50 p-4 rounded-lg">
+                <p className="font-semibold mb-2">Possible solutions:</p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>Check if MySQL is running</li>
+                  <li>Verify database credentials in .env.local</li>
+                  <li>Ensure the database and tables exist</li>
+                  <li>Check the browser console for details</li>
+                </ul>
+              </div>
+            </div>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="w-full bg-[#2596be] text-white px-4 py-2 rounded-lg hover:bg-[#1d7a99] transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
         </div>
       </div>
     );

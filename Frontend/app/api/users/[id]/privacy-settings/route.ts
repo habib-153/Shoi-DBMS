@@ -1,0 +1,118 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { query } from '@/lib/db';
+
+// GET - Get privacy settings for a user
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+
+    const settings: any[] = await query(
+      `SELECT * FROM privacy_settings WHERE user_id = ?`,
+      [id]
+    );
+
+    if (settings.length === 0) {
+      // Create default privacy settings if they don't exist
+      await query(
+        `INSERT INTO privacy_settings (user_id) VALUES (?)`,
+        [id]
+      );
+
+      const newSettings: any[] = await query(
+        `SELECT * FROM privacy_settings WHERE user_id = ?`,
+        [id]
+      );
+
+      return NextResponse.json({
+        success: true,
+        settings: newSettings[0]
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      settings: settings[0]
+    });
+
+  } catch (error: any) {
+    console.error('Error fetching privacy settings:', error);
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: 'Failed to fetch privacy settings',
+        details: error.message 
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT - Update privacy settings
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const body = await request.json();
+
+    // Remove user_id and setting_id from update
+    const { user_id, setting_id, created_at, ...updateFields } = body;
+
+    // Build update query dynamically
+    const fields = Object.keys(updateFields);
+    const values = Object.values(updateFields);
+
+    if (fields.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'No fields to update' },
+        { status: 400 }
+      );
+    }
+
+    const setClause = fields.map(field => `${field} = ?`).join(', ');
+
+    await query(
+      `UPDATE privacy_settings SET ${setClause} WHERE user_id = ?`,
+      [...values, id]
+    );
+
+    // Log the activity
+    try {
+      await query(
+        `INSERT INTO privacy_activity_log (user_id, action_type, action_details) 
+         VALUES (?, 'settings_changed', ?)`,
+        [id, JSON.stringify({ changed_fields: fields })]
+      );
+    } catch (logError) {
+      // Don't fail the update if logging fails
+      console.error('Failed to log privacy activity:', logError);
+    }
+
+    // Fetch updated settings
+    const updated: any[] = await query(
+      `SELECT * FROM privacy_settings WHERE user_id = ?`,
+      [id]
+    );
+
+    return NextResponse.json({
+      success: true,
+      message: 'Privacy settings updated successfully',
+      settings: updated[0]
+    });
+
+  } catch (error: any) {
+    console.error('Error updating privacy settings:', error);
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: 'Failed to update privacy settings',
+        details: error.message 
+      },
+      { status: 500 }
+    );
+  }
+}
