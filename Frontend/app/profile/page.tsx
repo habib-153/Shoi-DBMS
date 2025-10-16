@@ -120,6 +120,9 @@ export default function Profile() {
     setSaving(true);
     try {
       const userId = editedUser.user_id || editedUser.therapist_id;
+      console.log('Saving profile for user:', userId);
+      console.log('Data being sent:', editedUser);
+      
       const response = await fetch(`/api/users/${userId}`, {
         method: 'PUT',
         headers: {
@@ -128,15 +131,25 @@ export default function Profile() {
         body: JSON.stringify(editedUser),
       });
 
-      if (response.ok) {
-        setUser(editedUser);
+      console.log('Response status:', response.status);
+      const data = await response.json();
+      console.log('Response data:', data);
+
+      if (response.ok && data.success) {
+        // Update with the profile data from server response
+        const updatedProfile = data.profile;
+        setUser(updatedProfile);
+        setEditedUser(updatedProfile);
         setIsEditing(false);
-        localStorage.setItem('user', JSON.stringify(editedUser));
+        
+        // Update localStorage
+        localStorage.setItem('user', JSON.stringify(updatedProfile));
         window.dispatchEvent(new Event('userUpdated'));
+        
         alert('Profile updated successfully!');
       } else {
-        const error = await response.json();
-        alert(`Failed to update profile: ${error.error || 'Unknown error'}`);
+        console.error('Update failed:', data);
+        alert(`Failed to update profile: ${data.error || data.details || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -658,14 +671,7 @@ export default function Profile() {
                       <Calendar className="w-5 h-5 text-gray-400" />
                       <span>Book Appointment</span>
                     </button>
-                    <button 
-                      onClick={() => router.push('/therapists')}
-                      className="w-full flex items-center gap-3 p-3 text-left hover:bg-gray-50 rounded-lg transition-colors"
-                    >
-                      <User className="w-5 h-5 text-gray-400" />
-                      <span>Find Therapists</span>
-                    </button>
-                    <button 
+                    <button
                       onClick={() => router.push('/privacy-settings')}
                       className="w-full flex items-center gap-3 p-3 text-left hover:bg-gray-50 rounded-lg transition-colors"
                     >
