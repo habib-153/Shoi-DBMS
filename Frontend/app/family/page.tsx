@@ -15,7 +15,11 @@ import {
   Trash2,
   Edit,
   Save,
-  X
+  X,
+  CheckCircle,
+  AlertCircle,
+  Bell,
+  MessageSquare
 } from "lucide-react";
 
 interface FamilyMember {
@@ -24,51 +28,41 @@ interface FamilyMember {
   name: string;
   relation: string;
   contact: string;
-  can_view_progress: boolean;
 }
 
-interface SharedItem {
-  share_id: number;
-  user_id: number;
-  family_id: number;
-  item_type: string;
-  ref_id: number;
-  shared_at: string;
-  family_member_name: string;
-  relation: string;
-  user_name: string;
-}
 
-interface PrivacySettings {
+
+interface PrivacySettingsNew {
   setting_id?: number;
-  user_id: number;
-  shield_mode: boolean;
-  stealth_icon: string | null;
-  share_data_with_therapist: boolean;
+  user_id?: number;
+  profile_visibility: 'public' | 'private' | 'connections_only';
+  allow_messages: boolean;
+  appointment_reminders: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 function FamilyPage() {
   const { user } = useAuth();
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
-  const [sharedItems, setSharedItems] = useState<SharedItem[]>([]);
-  const [privacySettings, setPrivacySettings] = useState<PrivacySettings | null>(null);
+  const [privacySettings, setPrivacySettings] = useState<PrivacySettingsNew | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("family");
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingMember, setEditingMember] = useState<FamilyMember | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   // Add/Edit form state
   const [formData, setFormData] = useState({
     name: "",
     relation: "",
-    contact: "",
-    can_view_progress: false
+    contact: ""
   });
 
   useEffect(() => {
     if (user) {
       fetchFamilyMembers();
-      fetchSharedItems();
       fetchPrivacySettings();
     }
   }, [user]);
@@ -89,32 +83,78 @@ function FamilyPage() {
     }
   };
 
-  const fetchSharedItems = async () => {
-    if (!user) return;
-
-    try {
-      const response = await fetch(`/api/shared-items?userId=${user.user_id}`);
-      if (response.ok) {
-        const data = await response.json();
-        setSharedItems(data.shared_items || []);
-      }
-    } catch (error) {
-      console.error("Error fetching shared items:", error);
-    }
-  };
-
   const fetchPrivacySettings = async () => {
     if (!user) return;
 
     try {
-      const response = await fetch(`/api/users/${user.user_id}/privacy`);
-      if (response.ok) {
-        const data = await response.json();
-        setPrivacySettings(data.settings);
+      const response = await fetch(`/api/users/${user.user_id}/privacy-settings`);
+      const data = await response.json();
+      
+      if (data.success && data.settings) {
+        // Convert MySQL TINYINT (0/1) to boolean
+        const settings = {
+          ...data.settings,
+          allow_messages: Boolean(data.settings.allow_messages),
+          appointment_reminders: Boolean(data.settings.appointment_reminders)
+        };
+        setPrivacySettings(settings);
       }
     } catch (error) {
       console.error("Error fetching privacy settings:", error);
     }
+  };
+
+  const updatePrivacySetting = async (key: keyof PrivacySettingsNew, value: any) => {
+    if (!privacySettings || !user) return;
+
+    const previousSettings = { ...privacySettings };
+    const updated = { ...privacySettings, [key]: value };
+    setPrivacySettings(updated);
+
+    setSaving(true);
+    try {
+      // Convert boolean to number for MySQL TINYINT
+      const dataToSend = {
+        ...updated,
+        allow_messages: updated.allow_messages ? 1 : 0,
+        appointment_reminders: updated.appointment_reminders ? 1 : 0
+      };
+
+      const response = await fetch(`/api/users/${user.user_id}/privacy-settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dataToSend)
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        showMessage('success', 'Privacy settings updated!');
+        if (data.settings) {
+          // Convert MySQL TINYINT back to boolean
+          const settings = {
+            ...data.settings,
+            allow_messages: Boolean(data.settings.allow_messages),
+            appointment_reminders: Boolean(data.settings.appointment_reminders)
+          };
+          setPrivacySettings(settings);
+        }
+      } else {
+        showMessage('error', 'Failed to save settings');
+        setPrivacySettings(previousSettings);
+      }
+    } catch (error) {
+      console.error('Save error:', error);
+      showMessage('error', 'Failed to save settings');
+      setPrivacySettings(previousSettings);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const showMessage = (type: 'success' | 'error', text: string) => {
+    setMessage({ type, text });
+    setTimeout(() => setMessage(null), 3000);
   };
 
   const handleAddMember = async (e: React.FormEvent) => {
@@ -122,69 +162,64 @@ function FamilyPage() {
     if (!user) return;
 
     try {
+      // Determine if we're editing or adding
+      const isEditing = editingMember !== null;
+      const method = isEditing ? "PUT" : "POST";
+      const bodyData = isEditing 
+        ? { ...formData, family_id: editingMember.family_id }
+        : formData;
+
       const response = await fetch(`/api/users/${user.user_id}/family`, {
-        method: "POST",
+        method: method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(bodyData)
       });
 
       if (response.ok) {
         fetchFamilyMembers();
         setShowAddForm(false);
-        setFormData({ name: "", relation: "", contact: "", can_view_progress: false });
+        setEditingMember(null);
+        setFormData({ name: "", relation: "", contact: "" });
+        showMessage('success', isEditing ? 'Family member updated successfully!' : 'Family member added successfully!');
       } else {
-        alert("Failed to add family member");
+        const errorData = await response.json();
+        showMessage('error', errorData.error || (isEditing ? 'Failed to update family member' : 'Failed to add family member'));
       }
     } catch (error) {
-      console.error("Error adding family member:", error);
-      alert("Error adding family member");
+      console.error("Error with family member:", error);
+      showMessage('error', 'Error processing family member');
     }
   };
 
-  const updatePrivacySettings = async (newSettings: Partial<PrivacySettings>) => {
+
+
+  const handleDeleteMember = async (familyId: number, memberName: string) => {
     if (!user) return;
-
-    try {
-      const response = await fetch(`/api/users/${user.user_id}/privacy`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newSettings)
-      });
-
-      if (response.ok) {
-        fetchPrivacySettings();
-      } else {
-        alert("Failed to update privacy settings");
-      }
-    } catch (error) {
-      console.error("Error updating privacy settings:", error);
-      alert("Error updating privacy settings");
+    
+    if (!confirm(`Are you sure you want to remove ${memberName} from your family members?`)) {
+      return;
     }
-  };
-
-  const removeSharedItem = async (shareId: number) => {
-    if (!user) return;
 
     try {
-      const response = await fetch("/api/shared-items", {
+      const response = await fetch(`/api/users/${user.user_id}/family?family_id=${familyId}`, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ share_id: shareId, user_id: user.user_id })
       });
 
       if (response.ok) {
-        fetchSharedItems();
+        fetchFamilyMembers();
+        showMessage('success', 'Family member removed successfully!');
       } else {
-        alert("Failed to remove shared item");
+        const errorData = await response.json();
+        showMessage('error', errorData.error || 'Failed to remove family member');
       }
     } catch (error) {
-      console.error("Error removing shared item:", error);
-      alert("Error removing shared item");
+      console.error("Error removing family member:", error);
+      showMessage('error', 'Error removing family member');
     }
   };
 
   const resetForm = () => {
-    setFormData({ name: "", relation: "", contact: "", can_view_progress: false });
+    setFormData({ name: "", relation: "", contact: "" });
     setShowAddForm(false);
     setEditingMember(null);
   };
@@ -221,16 +256,6 @@ function FamilyPage() {
             Family Members
           </button>
           <button
-            onClick={() => setActiveTab("sharing")}
-            className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-              activeTab === "sharing"
-                ? "bg-[#2596be] text-white"
-                : "bg-white text-gray-700 hover:bg-gray-50"
-            }`}
-          >
-            Shared Items
-          </button>
-          <button
             onClick={() => setActiveTab("privacy")}
             className={`px-6 py-3 rounded-lg font-medium transition-colors ${
               activeTab === "privacy"
@@ -242,9 +267,32 @@ function FamilyPage() {
           </button>
         </div>
 
+        {/* Status Message */}
+        {message && (
+          <div className={`mb-6 p-4 rounded-lg flex items-center gap-2 ${
+            message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
+          }`}>
+            {message.type === 'success' ? (
+              <CheckCircle className="w-5 h-5" />
+            ) : (
+              <AlertCircle className="w-5 h-5" />
+            )}
+            <span>{message.text}</span>
+          </div>
+        )}
+
         {/* Family Members Tab */}
         {activeTab === "family" && (
           <div className="space-y-6">
+            {/* Info Banner */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-gray-700">
+                <p className="font-medium mb-1">Therapist Access</p>
+                <p className="text-xs">Your therapist can view your family members through Patient Records for comprehensive care. This helps them understand your support system better.</p>
+              </div>
+            </div>
+
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-semibold text-gray-800">Family Members</h2>
               <button
@@ -314,20 +362,7 @@ function FamilyPage() {
                     />
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      id="can_view_progress"
-                      checked={formData.can_view_progress}
-                      onChange={(e) => setFormData(prev => ({ ...prev, can_view_progress: e.target.checked }))}
-                      className="w-4 h-4 text-[#2596be] border-gray-300 rounded focus:ring-[#2596be]"
-                    />
-                    <label htmlFor="can_view_progress" className="text-sm text-gray-700">
-                      Allow this person to view my progress and shared items
-                    </label>
-                  </div>
-
-                  <div className="flex gap-3">
+                  <div className="flex gap-3 mt-4">
                     <button
                       type="submit"
                       className="bg-[#2596be] text-white px-6 py-2 rounded-lg hover:bg-[#1d7a99] transition-colors flex items-center gap-2"
@@ -363,13 +398,20 @@ function FamilyPage() {
                           setFormData({
                             name: member.name,
                             relation: member.relation,
-                            contact: member.contact || "",
-                            can_view_progress: member.can_view_progress
+                            contact: member.contact || ""
                           });
                         }}
                         className="p-1 text-gray-500 hover:text-blue-600 transition-colors"
+                        title="Edit member"
                       >
                         <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteMember(member.family_id, member.name)}
+                        className="p-1 text-gray-500 hover:text-red-600 transition-colors"
+                        title="Delete member"
+                      >
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
@@ -386,19 +428,6 @@ function FamilyPage() {
                     </div>
                   )}
 
-                  <div className="flex items-center gap-2 text-sm">
-                    {member.can_view_progress ? (
-                      <div className="flex items-center gap-1 text-green-600">
-                        <Eye className="w-4 h-4" />
-                        Can view progress
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1 text-red-600">
-                        <EyeOff className="w-4 h-4" />
-                        Cannot view progress
-                      </div>
-                    )}
-                  </div>
                 </div>
               ))}
             </div>
@@ -420,135 +449,122 @@ function FamilyPage() {
           </div>
         )}
 
-        {/* Shared Items Tab */}
-        {activeTab === "sharing" && (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-semibold text-gray-800">Shared Items</h2>
-            
-            {sharedItems.length === 0 ? (
-              <div className="bg-white rounded-xl shadow-lg p-12 text-center">
-                <Share2 className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-600 mb-2">Nothing shared yet</h3>
-                <p className="text-gray-500">Shared items will appear here when you share them with family members</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {sharedItems.map((item) => (
-                  <div key={item.share_id} className="bg-white rounded-xl shadow-lg p-6">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className="p-2 bg-[#2596be]/10 rounded-lg">
-                            <Share2 className="w-5 h-5 text-[#2596be]" />
-                          </div>
-                          <div>
-                            <h3 className="font-semibold text-gray-800">
-                              {item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1)} #{item.ref_id}
-                            </h3>
-                            <p className="text-sm text-gray-600">
-                              Shared with {item.family_member_name} ({item.relation})
-                            </p>
-                          </div>
-                        </div>
-                        <p className="text-xs text-gray-500">
-                          Shared on {new Date(item.shared_at).toLocaleDateString()}
-                        </p>
-                      </div>
-
-                      <button
-                        onClick={() => removeSharedItem(item.share_id)}
-                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Privacy Settings Tab */}
-        {activeTab === "privacy" && (
+        {activeTab === "privacy" && privacySettings && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-semibold text-gray-800">Privacy Settings</h2>
-            
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <div className="space-y-6">
-                {/* Shield Mode */}
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 bg-purple-100 rounded-lg">
-                      <Shield className="w-6 h-6 text-purple-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-800 mb-1">Shield Mode</h3>
-                      <p className="text-sm text-gray-600">
-                        Hide sensitive information from family members and add extra privacy protection
-                      </p>
-                    </div>
+            {/* Profile Visibility */}
+            <div className="bg-white rounded-xl shadow-sm border p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Eye className="w-5 h-5 text-[#2596be]" />
+                <h2 className="text-xl font-semibold">Profile Visibility</h2>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">Who can view your profile?</p>
+              
+              <div className="space-y-2">
+                <label className="flex items-center p-3 rounded-lg border-2 cursor-pointer hover:bg-gray-50 transition-colors" style={{ borderColor: privacySettings.profile_visibility === 'public' ? '#2596be' : '#e5e7eb' }}>
+                  <input
+                    type="radio"
+                    name="visibility"
+                    value="public"
+                    checked={privacySettings.profile_visibility === 'public'}
+                    onChange={(e) => updatePrivacySetting('profile_visibility', e.target.value)}
+                    className="w-4 h-4 text-[#2596be] focus:ring-[#2596be]"
+                  />
+                  <div className="ml-3">
+                    <p className="font-medium">Public</p>
+                    <p className="text-sm text-gray-600">Anyone can view your profile</p>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={privacySettings?.shield_mode || false}
-                      onChange={(e) => updatePrivacySettings({ shield_mode: e.target.checked })}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[#2596be]/25 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#2596be]"></div>
-                  </label>
-                </div>
+                </label>
 
-                {/* Data Sharing with Therapist */}
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 bg-green-100 rounded-lg">
-                      <Heart className="w-6 h-6 text-green-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-800 mb-1">Share Data with Therapist</h3>
-                      <p className="text-sm text-gray-600">
-                        Allow your therapist to access your health logs and assessment results
-                      </p>
-                    </div>
+                <label className="flex items-center p-3 rounded-lg border-2 cursor-pointer hover:bg-gray-50 transition-colors" style={{ borderColor: privacySettings.profile_visibility === 'connections_only' ? '#2596be' : '#e5e7eb' }}>
+                  <input
+                    type="radio"
+                    name="visibility"
+                    value="connections_only"
+                    checked={privacySettings.profile_visibility === 'connections_only'}
+                    onChange={(e) => updatePrivacySetting('profile_visibility', e.target.value)}
+                    className="w-4 h-4 text-[#2596be] focus:ring-[#2596be]"
+                  />
+                  <div className="ml-3">
+                    <p className="font-medium">Connections Only</p>
+                    <p className="text-sm text-gray-600">Only your therapist and family can view</p>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={privacySettings?.share_data_with_therapist !== false}
-                      onChange={(e) => updatePrivacySettings({ share_data_with_therapist: e.target.checked })}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[#2596be]/25 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#2596be]"></div>
-                  </label>
-                </div>
+                </label>
 
-                {/* Stealth Icon */}
-                <div>
-                  <div className="flex items-start gap-3 mb-3">
-                    <div className="p-2 bg-orange-100 rounded-lg">
-                      <Settings className="w-6 h-6 text-orange-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-800 mb-1">Stealth Icon</h3>
-                      <p className="text-sm text-gray-600">
-                        Change app icon to something discrete for privacy
-                      </p>
-                    </div>
+                <label className="flex items-center p-3 rounded-lg border-2 cursor-pointer hover:bg-gray-50 transition-colors" style={{ borderColor: privacySettings.profile_visibility === 'private' ? '#2596be' : '#e5e7eb' }}>
+                  <input
+                    type="radio"
+                    name="visibility"
+                    value="private"
+                    checked={privacySettings.profile_visibility === 'private'}
+                    onChange={(e) => updatePrivacySetting('profile_visibility', e.target.value)}
+                    className="w-4 h-4 text-[#2596be] focus:ring-[#2596be]"
+                  />
+                  <div className="ml-3">
+                    <p className="font-medium">Private</p>
+                    <p className="text-sm text-gray-600">Only you can view your profile</p>
                   </div>
-                  <select
-                    value={privacySettings?.stealth_icon || ""}
-                    onChange={(e) => updatePrivacySettings({ stealth_icon: e.target.value || null })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2596be] focus:border-transparent"
-                  >
-                    <option value="">Default App Icon</option>
-                    <option value="calculator">Calculator</option>
-                    <option value="notes">Notes</option>
-                    <option value="weather">Weather</option>
-                    <option value="calendar">Calendar</option>
-                  </select>
+                </label>
+              </div>
+            </div>
+
+            {/* Toggle Settings */}
+            <div className="bg-white rounded-xl shadow-sm border divide-y">
+              {/* Messages */}
+              <div className="flex items-start justify-between p-4 hover:bg-gray-50 transition-colors">
+                <div className="flex gap-3 flex-1">
+                  <MessageSquare className="w-5 h-5 text-[#2596be] mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <div className="font-medium text-gray-900">Allow Messages</div>
+                    <p className="text-sm text-gray-600 mt-1">Therapists can send you messages</p>
+                  </div>
                 </div>
+                <button
+                  onClick={() => updatePrivacySetting('allow_messages', !privacySettings.allow_messages)}
+                  disabled={saving}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#2596be] focus:ring-offset-2 disabled:opacity-50 ${
+                    privacySettings.allow_messages ? 'bg-[#2596be]' : 'bg-gray-300'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      privacySettings.allow_messages ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Appointment Reminders */}
+              <div className="flex items-start justify-between p-4 hover:bg-gray-50 transition-colors">
+                <div className="flex gap-3 flex-1">
+                  <Bell className="w-5 h-5 text-[#2596be] mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <div className="font-medium text-gray-900">Appointment Reminders</div>
+                    <p className="text-sm text-gray-600 mt-1">Receive notifications for upcoming sessions</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => updatePrivacySetting('appointment_reminders', !privacySettings.appointment_reminders)}
+                  disabled={saving}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#2596be] focus:ring-offset-2 disabled:opacity-50 ${
+                    privacySettings.appointment_reminders ? 'bg-[#2596be]' : 'bg-gray-300'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      privacySettings.appointment_reminders ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {/* Info Box */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-gray-700">
+                <p className="font-medium mb-1">About Privacy Settings</p>
+                <p className="text-xs">Your privacy matters. These settings control how your information is shared and who can interact with you. Therapists can view family members through patient records for comprehensive care.</p>
               </div>
             </div>
           </div>

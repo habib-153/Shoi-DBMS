@@ -185,11 +185,18 @@ export async function POST(req: Request) {
         }
       }
       
+      // Get next therapist_id (not auto_increment)
+      const [maxId]: any = await connection.execute(
+        `SELECT IFNULL(MAX(therapist_id), 0) + 1 as next_id FROM therapists`
+      );
+      const nextTherapistId = maxId[0]?.next_id || 1;
+      
       // Insert therapist - Using ACTUAL columns from your database
       // Your table has: license_no, years_experience, gender, fees_min, fees_max, 
       // bio, languages, rating, password_hash, Interested_field, educational_info, image
       const [result] = await connection.execute(
         `INSERT INTO therapists (
+          therapist_id,
           name, 
           email,
           password_hash,
@@ -203,8 +210,9 @@ export async function POST(req: Request) {
           Interested_field,
           fees_min,
           fees_max
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
+          nextTherapistId,
           name, 
           email,
           hashedPassword, // Use hashed password
@@ -221,18 +229,32 @@ export async function POST(req: Request) {
         ]
       );
       
-      const therapistId = (result as any).insertId;
+      const therapistId = nextTherapistId;
       console.log('Therapist created successfully:', therapistId);
       
-      // Try to update specialization if column exists
+      // Insert into therapist_specialties table
+      // Map specialization to specialty_id: 1 = Psychologist, 2 = Psychiatrist
+      let specialtyId = 1; // Default to Psychologist
+      
+      if (therapistSpecialization === 'psychiatrist') {
+        specialtyId = 2;
+      } else if (therapistSpecialization === 'psychologist') {
+        specialtyId = 1;
+      } else if (therapistSpecialization === 'counselor') {
+        specialtyId = 3; // Assuming counselor is specialty_id 3
+      } else {
+        specialtyId = 1; // Default to Psychologist for 'therapist' or others
+      }
+      
       try {
         await connection.execute(
-          `UPDATE therapists SET specialization = ? WHERE therapist_id = ?`,
-          [therapistSpecialization, therapistId]
+          `INSERT INTO therapist_specialties (therapist_id, specialty_id) VALUES (?, ?)`,
+          [therapistId, specialtyId]
         );
-        console.log('Specialization updated:', therapistSpecialization);
-      } catch (updateError: any) {
-        console.log('Specialization column does not exist - skipping update');
+        console.log('Therapist specialty added:', specialtyId, '(' + therapistSpecialization + ')');
+      } catch (specialtyError: any) {
+        console.error('Error adding therapist specialty:', specialtyError);
+        // Don't fail the registration if specialty insert fails, but log it
       }
       
       await connection.commit();

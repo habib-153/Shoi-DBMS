@@ -15,26 +15,58 @@ export async function GET(
       [id]
     ) as any[];
     
-    // Get completed sessions count (actual sessions, not just appointments)
+    // Get completed sessions count (sessions with session notes = completed)
     const completedSessions = await query(
-      `SELECT COUNT(*) as completed 
+      `SELECT COUNT(DISTINCT s.session_id) as completed 
        FROM sessions s
        JOIN appointments a ON s.appointment_id = a.appointment_id
+       JOIN session_notes sn ON s.session_id = sn.session_id
        WHERE a.user_id = ?`,
       [id]
     ) as any[];
     
-    // Get upcoming appointments (future appointments that are confirmed or pending or paid)
-    const upcomingCount = await query(
-      `SELECT COUNT(*) as upcoming 
+    console.log('Analytics API - Completed count:', completedSessions[0]?.completed);
+    
+    // Get cancelled appointments count
+    const cancelledCount = await query(
+      `SELECT COUNT(*) as cancelled 
        FROM appointments 
        WHERE user_id = ? 
-       AND start_time > NOW()
-       AND status IN ('confirmed', 'pending', 'paid')`,
+       AND status = 'cancelled'`,
       [id]
     ) as any[];
+    
+    // Get upcoming appointments (appointments WITHOUT session notes, regardless of date)
+    const upcomingCount = await query(
+      `SELECT COUNT(*) as upcoming 
+       FROM appointments a
+       LEFT JOIN sessions s ON a.appointment_id = s.appointment_id
+       LEFT JOIN session_notes sn ON s.session_id = sn.session_id
+       WHERE a.user_id = ? 
+       AND sn.note_id IS NULL
+       AND a.status != 'cancelled'`,
+      [id]
+    ) as any[];
+    
+    console.log('Analytics API - Upcoming count:', upcomingCount[0]?.upcoming);
+    
+    // Debug: Check all appointments
+    const debugAll = await query(
+      `SELECT 
+        a.appointment_id,
+        a.status,
+        s.session_id,
+        sn.note_id
+       FROM appointments a
+       LEFT JOIN sessions s ON a.appointment_id = s.appointment_id
+       LEFT JOIN session_notes sn ON s.session_id = sn.session_id
+       WHERE a.user_id = ?`,
+      [id]
+    ) as any[];
+    
+    console.log('Analytics API - All appointments debug:', debugAll);
 
-    // Get actual upcoming appointments details
+    // Get actual upcoming appointments details (without session notes, for display)
     const upcomingAppointments = await query(
       `SELECT 
         a.appointment_id,
@@ -47,9 +79,11 @@ export async function GET(
        JOIN therapists t ON a.therapist_id = t.therapist_id
        LEFT JOIN therapist_specialties tsp ON t.therapist_id = tsp.therapist_id
        LEFT JOIN specialties ts ON tsp.specialty_id = ts.specialty_id
+       LEFT JOIN sessions s ON a.appointment_id = s.appointment_id
+       LEFT JOIN session_notes sn ON s.session_id = sn.session_id
        WHERE a.user_id = ?
-       AND a.start_time > NOW()
-       AND a.status IN ('confirmed', 'pending', 'paid')
+       AND sn.note_id IS NULL
+       AND a.status != 'cancelled'
        ORDER BY a.start_time ASC
        LIMIT 5`,
       [id]
@@ -127,6 +161,7 @@ export async function GET(
         appointments: {
           total_appointments: appointmentCount[0]?.total || 0,
           completed_appointments: completedSessions[0]?.completed || 0,
+          cancelled_appointments: cancelledCount[0]?.cancelled || 0,
           upcoming_appointments: upcomingCount[0]?.upcoming || 0,
           upcoming_details: upcomingAppointments
         },

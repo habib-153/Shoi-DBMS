@@ -74,6 +74,12 @@ export async function PATCH(
       );
 
       if (existingSessions.length === 0) {
+        // Get next session_id
+        const maxSessionId: any = await query(
+          `SELECT IFNULL(MAX(session_id), 0) + 1 as next_id FROM sessions`
+        );
+        const nextSessionId = maxSessionId[0]?.next_id || 1;
+        
         // Create session automatically
         const now = new Date();
         const year = now.getFullYear();
@@ -87,12 +93,12 @@ export async function PATCH(
         const durationMin = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
 
         const sessionResult: any = await query(
-          `INSERT INTO sessions (appointment_id, session_date, duration_min)
-           VALUES (?, ?, ?)`,
-          [appointmentId, sessionDate, durationMin]
+          `INSERT INTO sessions (session_id, appointment_id, session_date, duration_min)
+           VALUES (?, ?, ?, ?)`,
+          [nextSessionId, appointmentId, sessionDate, durationMin]
         );
 
-        console.log(`✅ Auto-created session ${sessionResult.insertId} for appointment ${appointmentId}`);
+        console.log(`✅ Auto-created session ${nextSessionId} for appointment ${appointmentId}`);
       }
     }
 

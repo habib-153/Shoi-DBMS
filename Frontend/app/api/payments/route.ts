@@ -104,16 +104,23 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Get next payment_id (manual ID generation)
+    const maxIdResult: any = await query(
+      `SELECT MAX(payment_id) as max_id FROM payments`
+    );
+    const currentMaxId = maxIdResult[0]?.max_id || 0;
+    const next_payment_id = currentMaxId + 1;
+
     // Create payment record
     const result: any = await query(
-      `INSERT INTO payments (user_id, appointment_id, amount, status, payment_method, transaction_id, created_at)
-       VALUES (?, ?, ?, 'pending', ?, ?, NOW())`,
-      [user_id, appointment_id || null, amount, payment_method, transaction_id]
+      `INSERT INTO payments (payment_id, user_id, appointment_id, amount, status, payment_method, transaction_id, created_at)
+       VALUES (?, ?, ?, ?, 'pending', ?, ?, NOW())`,
+      [next_payment_id, user_id, appointment_id || null, amount, payment_method, transaction_id]
     );
 
     return NextResponse.json({
       success: true,
-      payment_id: result.insertId || null,
+      payment_id: next_payment_id,
       message: 'Payment created successfully'
     });
 

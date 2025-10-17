@@ -184,11 +184,32 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Check receiver's privacy settings - if receiver is a user, check if they allow messages
+      if (receiver_type === 'user') {
+        const [privacySettings]: any = await connection.execute(
+          `SELECT allow_messages FROM privacy_settings WHERE user_id = ?`,
+          [receiver_id]
+        );
+
+        if (privacySettings.length > 0 && privacySettings[0].allow_messages === 0) {
+          return NextResponse.json(
+            { error: 'This user has disabled receiving messages' },
+            { status: 403 }
+          );
+        }
+      }
+
+      // Get next message_id
+      const [maxId]: any = await connection.execute(
+        `SELECT IFNULL(MAX(message_id), 0) + 1 as next_id FROM messages`
+      );
+      const nextMessageId = maxId[0].next_id;
+
       // Insert the message
       const [result] = await connection.execute(
-        `INSERT INTO messages (sender_type, sender_id, receiver_type, receiver_id, message_text, message_type, appointment_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [sender_type, sender_id, receiver_type, receiver_id, message_text, message_type, appointment_id]
+        `INSERT INTO messages (message_id, sender_type, sender_id, receiver_type, receiver_id, message_text, message_type, appointment_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [nextMessageId, sender_type, sender_id, receiver_type, receiver_id, message_text, message_type, appointment_id]
       );
 
       // Get the created message with sender info
@@ -202,7 +223,7 @@ export async function POST(request: NextRequest) {
          LEFT JOIN users u ON m.sender_type = 'user' AND m.sender_id = u.user_id
          LEFT JOIN therapists t ON m.sender_type = 'therapist' AND m.sender_id = t.therapist_id
          WHERE m.message_id = ?`,
-        [(result as any).insertId]
+        [nextMessageId]
       );
 
       return NextResponse.json({ 

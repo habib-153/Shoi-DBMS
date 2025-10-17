@@ -34,15 +34,21 @@ export async function POST(req: NextRequest) {
     const amount = 1500;
     console.log('Creating payment with amount:', amount);
 
-    // Create payment record with only the columns that exist
+    // Get next payment_id (since it's not AUTO_INCREMENT)
+    const maxPaymentId: any = await query(
+      `SELECT IFNULL(MAX(payment_id), 0) + 1 as next_id FROM payments`
+    );
+    const nextPaymentId = maxPaymentId[0]?.next_id || 1;
+
+    // Create payment record with payment_id
     const result: any = await query(
-      `INSERT INTO payments (appointment_id, user_id, amount, currency, status) VALUES (?, ?, ?, 'BDT', 'pending')`,
-      [parsed.appointment_id, parsed.user_id, amount]
+      `INSERT INTO payments (payment_id, appointment_id, user_id, amount, currency, status) VALUES (?, ?, ?, ?, 'BDT', 'pending')`,
+      [nextPaymentId, parsed.appointment_id, parsed.user_id, amount]
     );
 
     return NextResponse.json({ 
       ok: true, 
-      payment_id: result.insertId || result[0]?.insertId || Math.floor(Date.now() / 1000),
+      payment_id: nextPaymentId,
       amount: amount,
       currency: 'BDT',
       appointment_details: {
@@ -56,6 +62,7 @@ export async function POST(req: NextRequest) {
     console.error("Error creating payment intent:", error);
     return NextResponse.json({ 
       ok: false, 
+      error: error instanceof Error ? error.message : "Failed to create payment intent",
       message: "Failed to create payment intent" 
     }, { status: 500 });
   }

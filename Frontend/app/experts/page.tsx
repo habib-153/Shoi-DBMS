@@ -2,7 +2,10 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Star, MapPin, Clock, Languages, GraduationCap, Award, Calendar, ArrowRight } from "lucide-react";
+import { Star, MapPin, Clock, Languages, GraduationCap, Award, Calendar, ArrowRight, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import { toast } from "sonner";
+import dayjs from "dayjs";
 
 interface Therapist {
   therapist_id: number;
@@ -29,8 +32,101 @@ export default function Experts() {
   const [sortBy, setSortBy] = useState("rating");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showBookingModal, setShowBookingModal] = useState(false);
+  const [selectedTherapist, setSelectedTherapist] = useState<Therapist | null>(null);
+  
+  // Booking states
+  const [selectedDate, setSelectedDate] = useState(dayjs().add(1, "day").format("YYYY-MM-DD"));
+  const [availableSlots, setAvailableSlots] = useState<{start: string; end: string}[]>([]);
+  const [selectedSlot, setSelectedSlot] = useState<{start: string; end: string} | null>(null);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [isBooking, setIsBooking] = useState(false);
+  
+  const { user } = useAuth();
 
   const specialties = ["all", "Anxiety Disorders", "Depression", "Child Psychology", "Couples Therapy", "Trauma Recovery", "Addiction Recovery"];
+
+  // Handle booking modal
+  const handleOpenBookingModal = (therapist: Therapist) => {
+    setSelectedTherapist(therapist);
+    setShowBookingModal(true);
+    setSelectedDate(dayjs().add(1, "day").format("YYYY-MM-DD"));
+    setSelectedSlot(null);
+  };
+
+  const handleCloseBookingModal = () => {
+    setShowBookingModal(false);
+    setSelectedTherapist(null);
+    setAvailableSlots([]);
+    setSelectedSlot(null);
+  };
+
+  // Fetch available slots when date or therapist changes
+  useEffect(() => {
+    if (!selectedTherapist || !selectedDate) return;
+    
+    const fetchSlots = async () => {
+      setSlotsLoading(true);
+      try {
+        const res = await fetch(`/api/slots?therapist_id=${selectedTherapist.therapist_id}&date=${selectedDate}`);
+        const data = await res.json();
+        if (data.ok && Array.isArray(data.slots)) {
+          setAvailableSlots(data.slots);
+        } else {
+          setAvailableSlots([]);
+        }
+      } catch (error) {
+        console.error('Error fetching slots:', error);
+        setAvailableSlots([]);
+      } finally {
+        setSlotsLoading(false);
+      }
+    };
+    
+    fetchSlots();
+  }, [selectedTherapist, selectedDate]);
+
+  const handleBookAppointment = async () => {
+    if (!selectedTherapist || !selectedSlot || !user) {
+      toast.error("Please select a time slot");
+      return;
+    }
+
+    setIsBooking(true);
+    try {
+      const res = await fetch("/api/appointments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: user.user_id || user.therapist_id,
+          therapist_id: selectedTherapist.therapist_id,
+          start_time: selectedSlot.start,
+          end_time: selectedSlot.end,
+          status: 'scheduled',
+        }),
+      });
+
+      const data = await res.json();
+      
+      if (!res.ok || !data.ok) {
+        throw new Error(data.message || 'Failed to book appointment');
+      }
+
+      toast.success("Appointment booked successfully!");
+      handleCloseBookingModal();
+      
+      // Optionally redirect to appointments page
+      setTimeout(() => {
+        window.location.href = '/appointments/history';
+      }, 1500);
+      
+    } catch (error: any) {
+      console.error('Booking error:', error);
+      toast.error(error.message || "Failed to book appointment");
+    } finally {
+      setIsBooking(false);
+    }
+  };
 
   // Fetch therapists from API
   useEffect(() => {
@@ -300,13 +396,13 @@ export default function Experts() {
 
                 {/* Actions */}
                 <div className="space-y-3">
-                  <Link 
-                    href="/appointments"
+                  <button 
+                    onClick={() => handleOpenBookingModal(therapist)}
                     className="w-full inline-flex items-center justify-center gap-2 bg-[#2596be] text-white px-4 py-2 rounded-lg hover:bg-[#1d7a99] transition-colors"
                   >
                     <Calendar className="w-4 h-4" />
                     Book Appointment
-                  </Link>
+                  </button>
                   <Link 
                     href={`/experts/${therapist.therapist_id}`}
                     className="w-full inline-flex items-center justify-center gap-2 border border-[#2596be] text-[#2596be] px-4 py-2 rounded-lg hover:bg-[#2596be]/5 transition-colors"
@@ -354,6 +450,189 @@ export default function Experts() {
           </div>
         </div>
       </div>
+
+      {/* Booking Confirmation Modal */}
+      {showBookingModal && selectedTherapist && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between z-10">
+              <h3 className="text-2xl font-bold text-gray-900">Book Appointment</h3>
+              <button
+                onClick={handleCloseBookingModal}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6">
+              {/* Therapist Card */}
+              <div className="bg-gradient-to-br from-[#2596be]/10 to-[#1d7a99]/10 rounded-xl p-6 mb-6">
+                <div className="flex items-start gap-4">
+                  {/* Profile Picture */}
+                  <div className="flex-shrink-0">
+                    <div className="w-20 h-20 bg-gradient-to-br from-[#2596be] to-[#1d7a99] rounded-full flex items-center justify-center text-white text-2xl font-bold">
+                      {selectedTherapist.name.charAt(0)}
+                    </div>
+                  </div>
+
+                  {/* Therapist Info */}
+                  <div className="flex-1">
+                    <h4 className="text-xl font-bold text-gray-900 mb-1">
+                      {selectedTherapist.name}
+                    </h4>
+                    <p className="text-[#2596be] font-medium mb-3">
+                      {selectedTherapist.qualifications || "Licensed Therapist"}
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="flex items-center text-gray-600">
+                        <Star className="w-4 h-4 text-yellow-400 fill-current mr-1" />
+                        <span className="font-medium">{selectedTherapist.rating || 4.5}</span>
+                        <span className="ml-1">Rating</span>
+                      </div>
+
+                      <div className="flex items-center text-gray-600">
+                        <Clock className="w-4 h-4 mr-1" />
+                        {selectedTherapist.experience_years || 0} years exp.
+                      </div>
+
+                      <div className="flex items-center text-gray-600">
+                        <Languages className="w-4 h-4 mr-1" />
+                        {selectedTherapist.languages || "English, Bengali"}
+                      </div>
+
+                      <div className="flex items-center text-gray-600">
+                        <MapPin className="w-4 h-4 mr-1" />
+                        {selectedTherapist.location || "Dhaka"}
+                      </div>
+                    </div>
+
+                    {/* Consultation Fee */}
+                    <div className="mt-3 pt-3 border-t border-[#2596be]/20">
+                      <p className="text-sm text-gray-600">Consultation Fee</p>
+                      <p className="text-xl font-bold text-gray-900">
+                        ৳{selectedTherapist.consultation_fee || 2000}
+                        <span className="text-sm font-normal text-gray-500 ml-1">/ session</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Date Selection */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Date
+                </label>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  min={dayjs().add(1, "day").format("YYYY-MM-DD")}
+                  max={dayjs().add(30, "days").format("YYYY-MM-DD")}
+                  onChange={(e) => {
+                    setSelectedDate(e.target.value);
+                    setSelectedSlot(null);
+                  }}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2596be] focus:border-transparent"
+                />
+              </div>
+
+              {/* Time Slots */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Available Time Slots
+                </label>
+                
+                {slotsLoading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#2596be] mx-auto mb-2"></div>
+                    <p className="text-sm text-gray-500">Loading available slots...</p>
+                  </div>
+                ) : availableSlots.length === 0 ? (
+                  <div className="text-center py-8 bg-gray-50 rounded-lg">
+                    <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                    <p className="text-gray-600">No available slots for this date</p>
+                    <p className="text-sm text-gray-500 mt-1">Please try another date</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-3 max-h-64 overflow-y-auto p-2">
+                    {availableSlots.map((slot, idx) => {
+                      const isSelected = selectedSlot?.start === slot.start;
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => setSelectedSlot(slot)}
+                          className={`px-4 py-3 rounded-lg border-2 transition-all text-sm font-medium ${
+                            isSelected
+                              ? 'border-[#2596be] bg-[#2596be] text-white shadow-md'
+                              : 'border-gray-200 hover:border-[#2596be] hover:bg-[#2596be]/5 text-gray-700'
+                          }`}
+                        >
+                          <div className="flex items-center justify-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {dayjs(slot.start).format("hh:mm A")}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Information */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 mt-0.5">
+                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div className="text-sm text-gray-700">
+                    <p className="font-medium mb-1">Session Details</p>
+                    <ul className="space-y-1 text-xs">
+                      <li>• Session duration: 45-60 minutes</li>
+                      <li>• You'll receive confirmation via email and SMS</li>
+                      <li>• Please arrive 5 minutes before your appointment</li>
+                      <li>• Cancellation allowed up to 24 hours before</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-6 flex gap-3">
+              <button
+                onClick={handleCloseBookingModal}
+                disabled={isBooking}
+                className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBookAppointment}
+                disabled={!selectedSlot || isBooking}
+                className="flex-1 px-6 py-3 bg-[#2596be] text-white rounded-lg hover:bg-[#1d7a99] transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isBooking ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    Booking...
+                  </>
+                ) : (
+                  <>
+                    <Calendar className="w-5 h-5" />
+                    Confirm Booking
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

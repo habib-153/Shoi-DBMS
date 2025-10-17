@@ -75,9 +75,19 @@ export async function POST(req: Request) {
       // Hash password using a simple method (in production, use bcrypt or better)
       const password_hash = Buffer.from(password).toString('base64');
 
+      // Get the next user_id (manual ID generation since AUTO_INCREMENT might not be set)
+      const [maxIdResult] = await connection.execute(
+        'SELECT MAX(user_id) as max_id FROM users'
+      );
+      const currentMaxId = (maxIdResult as any)[0]?.max_id || 0;
+      const next_user_id = currentMaxId + 1;
+      
+      console.log('Creating user with ID:', next_user_id);
+
       // Insert user with optional fields
       const [userResult] = await connection.execute(
         `INSERT INTO \`shoi\`.\`users\` (
+          user_id,
           name, 
           email, 
           password_hash, 
@@ -87,8 +97,9 @@ export async function POST(req: Request) {
           hobby,
           profession,
           free_text
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
+          next_user_id,
           name,
           email,
           password_hash,

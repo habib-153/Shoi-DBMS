@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Calendar, Clock, User, DollarSign, TrendingUp, MessageCircle, Settings, Star, Users, FileText, UserPlus } from "lucide-react";
+import { Calendar, Clock, User, DollarSign, TrendingUp, MessageCircle, Settings, Star, Users, FileText, UserPlus, ClipboardList } from "lucide-react";
 
 interface Appointment {
   appointment_id: number;
@@ -168,7 +168,7 @@ export default function TherapistDashboard() {
           return;
         }
         
-        const url = `/api/therapists/${therapist.therapist_id}/appointments?status=confirmed,pending,scheduled`;
+        const url = `/api/therapists/${therapist.therapist_id}/appointments?status=confirmed,pending,scheduled,paid,pending_payment`;
         console.log('Fetching URL:', url);
         
         const response = await fetch(url);
@@ -180,15 +180,22 @@ export default function TherapistDashboard() {
         if (data.success) {
           console.log('Total appointments returned:', data.appointments?.length || 0);
           
-          // Filter for future appointments only
-          const now = new Date();
-          console.log('Current time:', now.toISOString());
+          // Get today's date at start of day
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          console.log('Today (start of day):', today.toISOString());
           
+          // Filter for today's and future appointments
           const futureAppointments = (data.appointments || [])
             .filter((apt: Appointment) => {
               const aptTime = new Date(apt.start_time);
-              console.log(`Appointment ${apt.appointment_id}: ${apt.start_time} (${aptTime.toISOString()}) - Future: ${aptTime > now}`);
-              return aptTime > now;
+              const aptDate = new Date(aptTime);
+              aptDate.setHours(0, 0, 0, 0);
+              
+              // Include if appointment is today or in the future
+              const isTodayOrFuture = aptDate >= today;
+              console.log(`Appointment ${apt.appointment_id}: ${apt.start_time} - Today or Future: ${isTodayOrFuture}`);
+              return isTodayOrFuture;
             })
             .slice(0, 5);
           
@@ -296,9 +303,6 @@ export default function TherapistDashboard() {
               >
                 <Clock className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
               </button>
-              <Link href="/therapist/schedule" className="btn-primary px-4 py-2">
-                Manage Schedule
-              </Link>
               <Link href="/therapist/profile" className="p-2 text-muted-foreground hover:text-foreground rounded-lg hover:bg-white/5">
                 <Settings className="w-5 h-5" />
               </Link>
@@ -309,7 +313,7 @@ export default function TherapistDashboard() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <div className="card-modern border-0 p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -340,30 +344,20 @@ export default function TherapistDashboard() {
             </div>
           </div>
           
-          <div className="card-modern border-0 p-6">
+          <Link href="/therapist/referrals" className="card-modern border-0 p-6 hover:shadow-lg transition-shadow cursor-pointer bg-gradient-to-br from-[#2596be]/10 to-[#2596be]/20">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Average Rating</p>
-                <p className="text-2xl font-bold text-foreground">{Number(stats.averageRating || 0).toFixed(1)}</p>
+                <p className="text-sm text-[#2596be] font-medium">Pending Referrals</p>
+                <p className="text-2xl font-bold text-[#1d7a99]">{referralStats.pending}</p>
+                <p className="text-xs text-[#2596be] mt-1">{referralStats.total} total</p>
               </div>
-              <Star className="w-8 h-8 text-purple-600" />
-            </div>
-          </div>
-          
-          <Link href="/therapist/referrals" className="card-modern border-0 p-6 hover:shadow-lg transition-shadow cursor-pointer bg-gradient-to-br from-orange-50 to-orange-100">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-orange-700 font-medium">Pending Referrals</p>
-                <p className="text-2xl font-bold text-orange-900">{referralStats.pending}</p>
-                <p className="text-xs text-orange-600 mt-1">{referralStats.total} total</p>
-              </div>
-              <UserPlus className="w-8 h-8 text-orange-600" />
+              <UserPlus className="w-8 h-8 text-[#2596be]" />
             </div>
           </Link>
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           <Link href="/therapist/appointments" className="bg-[#2596be] text-white p-6 rounded-xl hover:bg-[#1d7a99] transition-colors">
             <Calendar className="w-8 h-8 mb-3" />
             <h3 className="font-semibold text-lg">Manage Appointments</h3>
@@ -382,8 +376,14 @@ export default function TherapistDashboard() {
             <p className="text-muted-foreground text-sm">Manage therapy sessions and notes</p>
           </Link>
 
-          <Link href="/therapist/referrals" className="card-modern border-0 p-6 hover:shadow-md transition-shadow group bg-gradient-to-br from-orange-50 to-orange-100">
-            <UserPlus className="w-8 h-8 text-orange-600 mb-3 group-hover:scale-110 transition-transform" />
+          <Link href="/therapist/assessments" className="card-modern border-0 p-6 hover:shadow-md transition-shadow group bg-gradient-to-br from-purple-50 to-purple-100">
+            <ClipboardList className="w-8 h-8 text-purple-600 mb-3 group-hover:scale-110 transition-transform" />
+            <h3 className="font-semibold text-lg text-foreground">Assessments</h3>
+            <p className="text-muted-foreground text-sm">Assign and track assessments</p>
+          </Link>
+
+          <Link href="/therapist/referrals" className="card-modern border-0 p-6 hover:shadow-md transition-shadow group bg-gradient-to-br from-[#2596be]/10 to-[#2596be]/20">
+            <UserPlus className="w-8 h-8 text-[#2596be] mb-3 group-hover:scale-110 transition-transform" />
             <h3 className="font-semibold text-lg text-foreground">Referrals</h3>
             <p className="text-muted-foreground text-sm">Patient psychiatric referrals</p>
           </Link>
@@ -540,13 +540,6 @@ export default function TherapistDashboard() {
               <div className="flex justify-between items-center p-4 bg-green-500/5 rounded-lg">
                 <span className="text-sm font-medium text-foreground">Completed Sessions (All Time)</span>
                 <span className="text-2xl font-bold text-green-700">{stats.completedSessions}</span>
-              </div>
-              <div className="flex justify-between items-center p-4 bg-purple-500/5 rounded-lg">
-                <span className="text-sm font-medium text-foreground">Average Rating</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl font-bold text-purple-700">{Number(stats.averageRating || 0).toFixed(1)}</span>
-                  <Star className="w-5 h-5 text-purple-700 fill-purple-700" />
-                </div>
               </div>
               <Link 
                 href="/therapist/patients" 

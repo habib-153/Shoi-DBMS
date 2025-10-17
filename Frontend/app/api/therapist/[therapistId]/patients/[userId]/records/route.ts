@@ -3,10 +3,10 @@ import { query } from '@/lib/db';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { therapistId: string; userId: string } }
+  { params }: { params: Promise<{ therapistId: string; userId: string }> }
 ) {
   try {
-    const { therapistId, userId } = params;
+    const { therapistId, userId } = await params;
 
     // Verify therapist has access to this patient (has had at least one appointment)
     const hasAccess = await query(`

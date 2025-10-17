@@ -3,12 +3,13 @@ import { query } from "@/lib/db";
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const referralId = parseInt(params.id);
+    const { id } = await params;
+    const referralId = parseInt(id);
     const body = await request.json();
-    const { status, user_id, patient_notes } = body;
+    const { status, user_id, response_notes } = body;
 
     // Validate required fields
     if (!status || !user_id) {
@@ -28,7 +29,7 @@ export async function PUT(
 
     // Check if referral exists and belongs to this user
     const referrals = await query(
-      `SELECT * FROM patient_referrals WHERE referral_id = ? AND user_id = ?`,
+      `SELECT * FROM referrals WHERE referral_id = ? AND user_id = ?`,
       [referralId, user_id]
     );
 
@@ -49,62 +50,99 @@ export async function PUT(
       );
     }
 
-    // Update referral status
+    // Update referral status (response_notes stored separately if needed)
     await query(
-      `UPDATE patient_referrals 
+      `UPDATE referrals 
        SET status = ?, 
-           patient_notes = ?,
            updated_at = NOW()
        WHERE referral_id = ?`,
-      [status, patient_notes || null, referralId]
+      [status, referralId]
     );
 
     // Create notification for the referring therapist
-    const notificationMessage = status === 'accepted'
-      ? `Patient has accepted the referral to psychiatrist`
-      : `Patient has declined the referral to psychiatrist`;
+    try {
+      const notificationMessage = status === 'accepted'
+        ? `Patient has accepted the referral to psychiatrist`
+        : `Patient has declined the referral to psychiatrist`;
 
-    await query(
-      `INSERT INTO notifications (
-        recipient_type,
-        recipient_id,
-        type,
-        title,
-        message,
-        link,
-        created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, NOW())`,
-      [
-        'therapist',
-        referral.referring_therapist_id,
-        'referral_response',
-        `Referral ${status}`,
-        notificationMessage,
-        `/therapist/referrals?id=${referralId}`
-      ]
-    );
+      // Get next notification_id
+      const maxNotifId: any = await query(
+        `SELECT IFNULL(MAX(notification_id), 0) + 1 as next_id FROM notifications`
+      );
+      const nextNotifId = maxNotifId[0]?.next_id || 1;
 
-    // If accepted, also notify the psychiatrist
-    if (status === 'accepted') {
       await query(
         `INSERT INTO notifications (
+          notification_id,
           recipient_type,
           recipient_id,
-          type,
+          sender_type,
+          sender_id,
+          notification_type,
           title,
           message,
-          link,
+          related_id,
+          action_url,
           created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
         [
+          nextNotifId,
           'therapist',
-          referral.referred_to_therapist_id,
-          'referral_accepted',
-          'Patient Accepted Referral',
-          'A patient has accepted your referral and may contact you for an appointment',
+          referral.referring_therapist_id,
+          'user',
+          user_id,
+          'referral',
+          `Referral ${status}`,
+          notificationMessage,
+          referralId,
           `/therapist/referrals?id=${referralId}`
         ]
       );
+    } catch (notifError) {
+      console.error('Failed to create notification (non-critical):', notifError);
+      // Continue anyway - referral update was successful
+    }
+
+    // If accepted, also notify the psychiatrist
+    if (status === 'accepted') {
+      try {
+        // Get next notification_id
+        const maxNotifId2: any = await query(
+          `SELECT IFNULL(MAX(notification_id), 0) + 1 as next_id FROM notifications`
+        );
+        const nextNotifId2 = maxNotifId2[0]?.next_id || 1;
+
+        await query(
+          `INSERT INTO notifications (
+            notification_id,
+            recipient_type,
+            recipient_id,
+            sender_type,
+            sender_id,
+            notification_type,
+            title,
+            message,
+            related_id,
+            action_url,
+            created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+          [
+            nextNotifId2,
+            'therapist',
+            referral.referred_to_therapist_id,
+            'user',
+            user_id,
+            'referral',
+            'Patient Accepted Referral',
+            'A patient has accepted your referral and may contact you for an appointment',
+            referralId,
+            `/therapist/referrals?id=${referralId}`
+          ]
+        );
+      } catch (notifError) {
+        console.error('Failed to create psychiatrist notification (non-critical):', notifError);
+        // Continue anyway
+      }
     }
 
     return NextResponse.json({

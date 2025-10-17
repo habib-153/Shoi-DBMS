@@ -15,10 +15,17 @@ export async function GET(
     );
 
     if (settings.length === 0) {
+      // Get next setting_id
+      const maxIdResult: any = await query(
+        `SELECT MAX(setting_id) as max_id FROM privacy_settings`
+      );
+      const currentMaxId = maxIdResult[0]?.max_id || 0;
+      const next_setting_id = currentMaxId + 1;
+
       // Create default privacy settings if they don't exist
       await query(
-        `INSERT INTO privacy_settings (user_id) VALUES (?)`,
-        [id]
+        `INSERT INTO privacy_settings (setting_id, user_id) VALUES (?, ?)`,
+        [next_setting_id, id]
       );
 
       const newSettings: any[] = await query(

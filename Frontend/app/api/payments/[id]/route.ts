@@ -51,7 +51,13 @@ export async function PATCH(
           );
 
           if (existingSession.length === 0) {
-            // 4. Create a session
+            // 4. Get next session_id
+            const maxSessionId: any = await query(
+              `SELECT IFNULL(MAX(session_id), 0) + 1 as next_id FROM sessions`
+            );
+            const nextSessionId = maxSessionId[0]?.next_id || 1;
+            
+            // 5. Create a session
             const startTime = new Date(`1970-01-01T${appointment.start_time}Z`);
             const endTime = new Date(`1970-01-01T${appointment.end_time}Z`);
             const durationMin = (endTime.getTime() - startTime.getTime()) / (1000 * 60); // Duration in minutes
@@ -60,9 +66,10 @@ export async function PATCH(
             const sessionDate = new Date(appointment.start_time).toISOString().split('T')[0];
 
             const sessionInsertResult = await query(
-              `INSERT INTO sessions (appointment_id, session_date, duration_min)
-               VALUES (?, ?, ?)`,
+              `INSERT INTO sessions (session_id, appointment_id, session_date, duration_min)
+               VALUES (?, ?, ?, ?)`,
               [
+                nextSessionId,
                 appointment.appointment_id,
                 sessionDate,
                 durationMin

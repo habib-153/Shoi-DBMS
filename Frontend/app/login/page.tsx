@@ -68,6 +68,11 @@ export default function LoginPage() {
     <div className="relative min-h-screen bg-gradient-modern flex items-center justify-center px-4">
       <LanguageSwitcher />
       <Card className="w-full max-w-md p-8 card-modern border-0">
+        {/* Logo */}
+        <div className="flex justify-center mb-6">
+          <img src="/4F43E8E1-1786-4A37-93AF-2E381EE3B968.png" alt="সই Logo" className="h-20 w-auto" />
+        </div>
+        
         <h1 className="text-3xl font-bold text-center mb-1 text-primary">সই</h1>
         <p className="text-center text-muted-foreground mb-6">
           Login To Your Account

@@ -110,18 +110,24 @@ export async function POST(
     const endTime = new Date(`1970-01-01T${appointment.end_time}`);
     const calculatedDuration = duration_min || Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
 
+    // Get next session_id
+    const maxSessionId: any = await query(
+      `SELECT IFNULL(MAX(session_id), 0) + 1 as next_id FROM sessions`
+    );
+    const nextSessionId = maxSessionId[0]?.next_id || 1;
+
     const result: any = await query(
-      `INSERT INTO sessions (appointment_id, session_date, duration_min)
-       VALUES (?, ?, ?)`,
-      [appointment_id, defaultSessionDate, calculatedDuration]
+      `INSERT INTO sessions (session_id, appointment_id, session_date, duration_min)
+       VALUES (?, ?, ?, ?)`,
+      [nextSessionId, appointment_id, defaultSessionDate, calculatedDuration]
     );
 
     return NextResponse.json({
       success: true,
-      session_id: result.insertId,
+      session_id: nextSessionId,
       message: 'Session created successfully',
       session: {
-        session_id: result.insertId,
+        session_id: nextSessionId,
         appointment_id,
         session_date: defaultSessionDate,
         duration_min: calculatedDuration
