@@ -192,6 +192,16 @@ function AppointmentPageContent() {
       return;
     }
 
+    // Validate user_id
+    const userId = user?.user_id || user?.therapist_id;
+    if (!userId) {
+      toast.error("User not authenticated. Please log in again.");
+      router.push('/login');
+      return;
+    }
+
+    console.log('Booking appointment for user_id:', userId); // Debug log
+
     // Store the current picked slot
     const bookedSlot = pickedSlot;
     
@@ -203,23 +213,29 @@ function AppointmentPageContent() {
 
     try {
       // 1) appointment
+      const appointmentData = {
+        user_id: userId,
+        therapist_id: selectedTherapist.therapist_id,
+        start_time: bookedSlot.start,
+        end_time: bookedSlot.end,
+        status: shouldPayNow ? 'pending_payment' : 'scheduled',
+      };
+      
+      console.log('Sending appointment data:', appointmentData); // Debug log
+      
       const r1 = await fetch("/api/appointments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_id: user?.user_id || user?.therapist_id,
-          therapist_id: selectedTherapist.therapist_id,
-          start_time: bookedSlot.start,
-          end_time: bookedSlot.end,
-          status: shouldPayNow ? 'pending_payment' : 'scheduled',
-        }),
+        body: JSON.stringify(appointmentData),
       });
       const j1 = await r1.json();
       
       console.log('Appointment response:', j1); // Debug log
       
       if (!r1.ok || !j1.ok || typeof j1.appointment_id !== 'number' || j1.appointment_id < 0) {
-        throw new Error(j1.message || 'Failed to create appointment');
+        const errorMsg = j1.message || j1.error || 'Failed to create appointment';
+        console.error('Appointment creation failed:', errorMsg);
+        throw new Error(errorMsg);
       }
       
       console.log('Appointment created successfully with ID:', j1.appointment_id);

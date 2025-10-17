@@ -4,10 +4,10 @@ import { query } from '@/lib/db';
 // GET - Retrieve symptoms for a specific patient (therapist view)
 export async function GET(
   request: NextRequest,
-  { params }: { params: { therapistId: string; userId: string } }
+  { params }: { params: Promise<{ therapistId: string; userId: string }> }
 ) {
   try {
-    const { therapistId, userId } = params;
+    const { therapistId, userId } = await params;
     const searchParams = request.nextUrl.searchParams;
     const days = searchParams.get('days') || '30';
 

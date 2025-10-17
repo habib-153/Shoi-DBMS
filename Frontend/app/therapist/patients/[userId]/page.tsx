@@ -2,11 +2,19 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Calendar, Activity, Brain, Heart, Moon, AlertTriangle, FileText, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { ArrowLeft, Calendar, Activity, Brain, Heart, Moon, AlertTriangle, FileText, TrendingUp, TrendingDown, Minus, Users } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import dayjs from "dayjs";
+
+interface FamilyMember {
+  family_id: number;
+  user_id: number;
+  name: string;
+  relation: string;
+  contact: string;
+}
 
 interface PatientRecord {
   success: boolean;
@@ -83,8 +91,10 @@ export default function PatientRecordPage() {
   const router = useRouter();
   const [record, setRecord] = useState<PatientRecord | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'health' | 'symptoms' | 'sessions'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'health' | 'symptoms' | 'sessions' | 'family'>('overview');
   const [therapistId, setTherapistId] = useState<number | null>(null);
+  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
+  const [loadingFamily, setLoadingFamily] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -101,6 +111,7 @@ export default function PatientRecordPage() {
   useEffect(() => {
     if (therapistId && params.userId) {
       fetchPatientRecord();
+      fetchFamilyMembers();
     }
   }, [therapistId, params.userId]);
 
@@ -118,6 +129,25 @@ export default function PatientRecordPage() {
       console.error('Error fetching patient record:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchFamilyMembers = async () => {
+    try {
+      setLoadingFamily(true);
+      const response = await fetch(`/api/users/${params.userId}/family`);
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Family members response:', data); // Debug log
+        setFamilyMembers(data.family_members || []);
+      } else {
+        const errorText = await response.text();
+        console.error('Failed to fetch family members:', response.status, errorText);
+      }
+    } catch (error) {
+      console.error('Error fetching family members:', error);
+    } finally {
+      setLoadingFamily(false);
     }
   };
 
@@ -266,6 +296,14 @@ export default function PatientRecordPage() {
           >
             <FileText className="w-4 h-4 mr-2" />
             Sessions ({record.sessions.length})
+          </Button>
+          <Button
+            onClick={() => setActiveTab('family')}
+            variant={activeTab === 'family' ? 'default' : 'outline'}
+            className={activeTab === 'family' ? 'bg-[#2596be]' : ''}
+          >
+            <Users className="w-4 h-4 mr-2" />
+            Family ({familyMembers.length})
           </Button>
         </div>
 
@@ -612,6 +650,69 @@ export default function PatientRecordPage() {
                 <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-foreground mb-2">No Sessions</h3>
                 <p className="text-muted-foreground">No sessions have been completed with this patient yet.</p>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {/* Family Tab */}
+        {activeTab === 'family' && (
+          <div className="space-y-6">
+            <Card className="card-modern border-0 p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <Users className="w-6 h-6 text-[#2596be]" />
+                <h3 className="text-xl font-semibold text-foreground">Family & Support Network</h3>
+              </div>
+              
+              {loadingFamily ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#2596be] mx-auto"></div>
+                  <p className="mt-4 text-muted-foreground">Loading family information...</p>
+                </div>
+              ) : familyMembers.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {familyMembers.map((member) => (
+                    <Card key={member.family_id} className="p-4 bg-muted/30">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-foreground text-lg">{member.name}</h4>
+                          <Badge variant="outline" className="mt-1 text-xs">
+                            {member.relation}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <span className="font-medium">Contact:</span>
+                          <span>{member.contact}</span>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-foreground mb-2">No Family Members Added</h3>
+                  <p className="text-muted-foreground">
+                    This patient hasn't added any family members or emergency contacts yet.
+                  </p>
+                </div>
+              )}
+            </Card>
+
+            {familyMembers.length > 0 && (
+              <Card className="card-modern border-0 p-6 bg-blue-50">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-blue-600 mt-0.5" />
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-1">Information Notice</h4>
+                    <p className="text-sm text-muted-foreground">
+                      This information is provided by the patient for emergency contact purposes and to understand their support network. 
+                      It is read-only and can only be modified by the patient.
+                    </p>
+                  </div>
+                </div>
               </Card>
             )}
           </div>

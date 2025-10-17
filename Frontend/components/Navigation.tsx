@@ -170,6 +170,17 @@ export default function Navigation() {
                           Messages
                         </Link>
 
+                        {user?.role === 'therapist' && (
+                          <Link
+                            href="/therapist/assessments"
+                            className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-[#2596be]/10 hover:text-[#2596be] transition-all duration-200"
+                            onClick={() => setUserMenuOpen(false)}
+                          >
+                            <NotepadText className="w-4 h-4" />
+                            Assessments
+                          </Link>
+                        )}
+
                         {user?.role !== 'therapist' && (
                           <>
                             <Link
@@ -290,6 +301,13 @@ export default function Navigation() {
                     <MessageCircle className="w-4 h-4" />
                     Messages
                   </Link>
+
+                  {user?.role === 'therapist' && (
+                    <Link href="/therapist/assessments" className="flex items-center gap-3 px-3 py-2 text-white hover:bg-white/10 rounded-lg transition-colors duration-200">
+                      <NotepadText className="w-4 h-4" />
+                      Assessments
+                    </Link>
+                  )}
 
                   {user?.role !== 'therapist' && (
                     <>

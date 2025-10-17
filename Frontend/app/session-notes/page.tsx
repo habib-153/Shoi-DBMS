@@ -17,10 +17,15 @@ import {
   Mail,
   Award,
   BookOpen,
-  X
+  X,
+  Star,
+  MapPin,
+  Languages
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+import dayjs from "dayjs";
 
 interface SessionNote {
   note_id: number;
@@ -82,6 +87,24 @@ function SessionNotesPage() {
   const [filteredNotes, setFilteredNotes] = useState<SessionNote[]>([]);
   const [activeTab, setActiveTab] = useState<'notes' | 'referrals'>('notes');
   const [processingReferral, setProcessingReferral] = useState<number | null>(null);
+
+  // Booking modal states
+  const [showBookingModal, setShowBookingModal] = useState(false);
+  const [selectedPsychiatrist, setSelectedPsychiatrist] = useState<{
+    id: number;
+    name: string;
+    email: string;
+    phone: string;
+    experience?: number;
+    rating?: number;
+    fees_min?: number;
+    fees_max?: number;
+  } | null>(null);
+  const [selectedDate, setSelectedDate] = useState(dayjs().add(1, "day").format("YYYY-MM-DD"));
+  const [availableSlots, setAvailableSlots] = useState<{start: string; end: string}[]>([]);
+  const [selectedSlot, setSelectedSlot] = useState<{start: string; end: string} | null>(null);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [isBooking, setIsBooking] = useState(false);
 
   useEffect(() => {
     if (user?.user_id) {
@@ -211,9 +234,144 @@ function SessionNotesPage() {
     }
   };
 
-  const handleBookAppointment = (psychiatristId: number, psychiatristName: string) => {
-    // Redirect to appointments page with psychiatrist pre-selected
-    window.location.href = `/appointments?therapist_id=${psychiatristId}&therapist_name=${encodeURIComponent('Dr. ' + psychiatristName)}`;
+  const handleBookAppointment = (psychiatristId: number, psychiatristName: string, psychiatristEmail: string, psychiatristPhone: string, psychiatristExperience?: number, psychiatristRating?: number, psychiatristFeesMin?: number, psychiatristFeesMax?: number) => {
+    console.log('handleBookAppointment called with:', {
+      psychiatristId,
+      psychiatristName,
+      psychiatristEmail,
+      psychiatristPhone,
+      psychiatristExperience,
+      psychiatristRating,
+      psychiatristFeesMin,
+      psychiatristFeesMax
+    });
+    
+    setSelectedPsychiatrist({
+      id: psychiatristId,
+      name: psychiatristName,
+      email: psychiatristEmail,
+      phone: psychiatristPhone,
+      experience: psychiatristExperience,
+      rating: psychiatristRating,
+      fees_min: psychiatristFeesMin,
+      fees_max: psychiatristFeesMax
+    });
+    setShowBookingModal(true);
+    setSelectedDate(dayjs().add(1, "day").format("YYYY-MM-DD"));
+    setSelectedSlot(null);
+    
+    console.log('Modal should now be visible, showBookingModal:', true);
+  };
+
+  const handleCloseBookingModal = () => {
+    setShowBookingModal(false);
+    setSelectedPsychiatrist(null);
+    setAvailableSlots([]);
+    setSelectedSlot(null);
+  };
+
+  // Fetch available slots when date or psychiatrist changes
+  useEffect(() => {
+    if (!selectedPsychiatrist || !selectedDate) {
+      console.log('Skipping slot fetch - missing psychiatrist or date:', { selectedPsychiatrist, selectedDate });
+      return;
+    }
+    
+    console.log('Fetching slots for:', {
+      therapist_id: selectedPsychiatrist.id,
+      date: selectedDate
+    });
+    
+    const fetchSlots = async () => {
+      setSlotsLoading(true);
+      try {
+        const url = `/api/slots?therapist_id=${selectedPsychiatrist.id}&date=${selectedDate}`;
+        console.log('Fetching from URL:', url);
+        
+        const res = await fetch(url);
+        const data = await res.json();
+        
+        console.log('Slots API response:', data);
+        
+        // API returns array directly, not {ok: true, slots: []}
+        if (Array.isArray(data)) {
+          console.log('Setting available slots:', data);
+          setAvailableSlots(data);
+        } else {
+          console.log('No slots available or invalid response');
+          setAvailableSlots([]);
+        }
+      } catch (error) {
+        console.error('Error fetching slots:', error);
+        setAvailableSlots([]);
+      } finally {
+        setSlotsLoading(false);
+      }
+    };
+    
+    fetchSlots();
+  }, [selectedPsychiatrist, selectedDate]);
+
+  const handleConfirmBooking = async (shouldPayNow: boolean = false) => {
+    if (!selectedPsychiatrist || !selectedSlot || !user) {
+      toast.error("Please select a time slot");
+      return;
+    }
+
+    setIsBooking(true);
+    try {
+      const res = await fetch("/api/appointments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: user.user_id,
+          therapist_id: selectedPsychiatrist.id,
+          start_time: selectedSlot.start,
+          end_time: selectedSlot.end,
+          status: shouldPayNow ? 'pending_payment' : 'scheduled',
+        }),
+      });
+
+      const data = await res.json();
+      
+      console.log('Appointment booking response:', data);
+      
+      if (!res.ok || !data.ok) {
+        throw new Error(data.message || 'Failed to book appointment');
+      }
+
+      if (shouldPayNow && data.appointment_id) {
+        // Create payment intent
+        toast.success("Appointment booked! Redirecting to payment...");
+        
+        const paymentRes = await fetch("/api/payments/intent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            appointment_id: data.appointment_id, 
+            user_id: user.user_id 
+          }),
+        });
+
+        const paymentData = await paymentRes.json();
+        
+        if (!paymentRes.ok || !paymentData.ok || !paymentData.payment_id) {
+          throw new Error(paymentData.message || 'Failed to initialize payment');
+        }
+
+        // Redirect to payment page
+        window.location.href = `/pay/${data.appointment_id}?pid=${paymentData.payment_id}`;
+      } else {
+        toast.success("Appointment booked successfully!");
+        handleCloseBookingModal();
+      }
+      
+    } catch (error: any) {
+      console.error('Booking error:', error);
+      toast.error(error.message || "Failed to book appointment");
+    } finally {
+      setIsBooking(false);
+    }
   };
 
   if (loading) {
@@ -564,7 +722,20 @@ function SessionNotesPage() {
                           <p className="font-medium text-gray-800">You have accepted this referral</p>
                         </div>
                         <button
-                          onClick={() => handleBookAppointment(referral.referred_to_therapist_id, referral.psychiatrist_name)}
+                          onClick={() => {
+                            console.log('Book Appointment button clicked!');
+                            console.log('Referral data:', referral);
+                            handleBookAppointment(
+                              referral.referred_to_therapist_id, 
+                              referral.psychiatrist_name,
+                              referral.psychiatrist_email,
+                              referral.psychiatrist_phone,
+                              referral.psychiatrist_experience,
+                              referral.psychiatrist_rating,
+                              referral.psychiatrist_fees_min,
+                              referral.psychiatrist_fees_max
+                            );
+                          }}
                           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
                         >
                           <Calendar className="w-4 h-4" />
@@ -609,6 +780,223 @@ function SessionNotesPage() {
           </div>
         )}
       </div>
+
+      {/* Booking Modal */}
+      {showBookingModal && selectedPsychiatrist ? (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4" style={{ zIndex: 9999 }}>
+          <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between" style={{ zIndex: 10 }}>
+              <h3 className="text-2xl font-bold text-gray-900">Book Appointment</h3>
+              <button
+                onClick={handleCloseBookingModal}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6">
+              {/* Psychiatrist Card */}
+              <div className="bg-gradient-to-br from-[#2596be]/10 to-[#1d7a99]/10 rounded-xl p-6 mb-6">
+                <div className="flex items-start gap-4">
+                  {/* Profile Picture */}
+                  <div className="flex-shrink-0">
+                    <div className="w-20 h-20 bg-gradient-to-br from-[#2596be] to-[#1d7a99] rounded-full flex items-center justify-center text-white text-2xl font-bold">
+                      {selectedPsychiatrist.name.charAt(0)}
+                    </div>
+                  </div>
+
+                  {/* Psychiatrist Info */}
+                  <div className="flex-1">
+                    <h4 className="text-xl font-bold text-gray-900 mb-1">
+                      Dr. {selectedPsychiatrist.name}
+                    </h4>
+                    <p className="text-[#2596be] font-medium mb-3">
+                      Psychiatrist
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      {selectedPsychiatrist.rating && (
+                        <div className="flex items-center text-gray-600">
+                          <Star className="w-4 h-4 text-yellow-400 fill-current mr-1" />
+                          <span className="font-medium">{selectedPsychiatrist.rating}</span>
+                          <span className="ml-1">Rating</span>
+                        </div>
+                      )}
+
+                      {selectedPsychiatrist.experience && (
+                        <div className="flex items-center text-gray-600">
+                          <Clock className="w-4 h-4 mr-1" />
+                          {selectedPsychiatrist.experience} years exp.
+                        </div>
+                      )}
+
+                      <div className="flex items-center text-gray-600">
+                        <Mail className="w-4 h-4 mr-1" />
+                        {selectedPsychiatrist.email}
+                      </div>
+
+                      <div className="flex items-center text-gray-600">
+                        <Phone className="w-4 h-4 mr-1" />
+                        {selectedPsychiatrist.phone}
+                      </div>
+                    </div>
+
+                    {/* Consultation Fee */}
+                    {selectedPsychiatrist.fees_min && (
+                      <div className="mt-3 pt-3 border-t border-[#2596be]/20">
+                        <p className="text-sm text-gray-600">Consultation Fee</p>
+                        <p className="text-xl font-bold text-gray-900">
+                          ৳{selectedPsychiatrist.fees_min}
+                          {selectedPsychiatrist.fees_max && selectedPsychiatrist.fees_max !== selectedPsychiatrist.fees_min && 
+                            <span> - ৳{selectedPsychiatrist.fees_max}</span>
+                          }
+                          <span className="text-sm font-normal text-gray-500 ml-1">/ session</span>
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Date Selection */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Date
+                </label>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  min={dayjs().add(1, "day").format("YYYY-MM-DD")}
+                  max={dayjs().add(30, "days").format("YYYY-MM-DD")}
+                  onChange={(e) => {
+                    setSelectedDate(e.target.value);
+                    setSelectedSlot(null);
+                  }}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2596be] focus:border-transparent"
+                />
+              </div>
+
+              {/* Time Slots */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Available Time Slots
+                </label>
+                
+                {slotsLoading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#2596be] mx-auto mb-2"></div>
+                    <p className="text-sm text-gray-500">Loading available slots...</p>
+                  </div>
+                ) : availableSlots.length === 0 ? (
+                  <div className="text-center py-8 bg-gray-50 rounded-lg">
+                    <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                    <p className="text-gray-600">No available slots for this date</p>
+                    <p className="text-sm text-gray-500 mt-1">Please try another date</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-3 max-h-64 overflow-y-auto p-2">
+                    {availableSlots.map((slot, idx) => {
+                      const isSelected = selectedSlot?.start === slot.start;
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => setSelectedSlot(slot)}
+                          className={`px-4 py-3 rounded-lg border-2 transition-all text-sm font-medium ${
+                            isSelected
+                              ? 'border-[#2596be] bg-[#2596be] text-white shadow-md'
+                              : 'border-gray-200 hover:border-[#2596be] hover:bg-[#2596be]/5 text-gray-700'
+                          }`}
+                        >
+                          <div className="flex items-center justify-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {dayjs(slot.start).format("hh:mm A")}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Information */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 mt-0.5">
+                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div className="text-sm text-gray-700">
+                    <p className="font-medium mb-1">Session Details</p>
+                    <ul className="space-y-1 text-xs">
+                      <li>• Session duration: 45-60 minutes</li>
+                      <li>• You'll receive confirmation via email and SMS</li>
+                      <li>• Please arrive 5 minutes before your appointment</li>
+                      <li>• Cancellation allowed up to 24 hours before</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-6">
+              <div className="flex gap-3 mb-3">
+                <button
+                  onClick={handleCloseBookingModal}
+                  disabled={isBooking}
+                  className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => handleConfirmBooking(false)}
+                  disabled={!selectedSlot || isBooking}
+                  className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isBooking ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      Booking...
+                    </>
+                  ) : (
+                    <>
+                      <Calendar className="w-5 h-5" />
+                      Pay Later
+                    </>
+                  )}
+                </button>
+                
+                <button
+                  onClick={() => handleConfirmBooking(true)}
+                  disabled={!selectedSlot || isBooking}
+                  className="px-6 py-3 bg-[#2596be] text-white rounded-lg hover:bg-[#1d7a99] transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isBooking ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      Booking...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                      </svg>
+                      Pay Now
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

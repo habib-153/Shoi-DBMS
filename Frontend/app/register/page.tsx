@@ -159,6 +159,11 @@ export default function RegisterPage() {
   return (
     <div className="relative min-h-screen bg-gradient-modern flex items-center justify-center px-4">
       <Card className="relative w-full max-w-5xl p-6 sm:p-8 card-modern border-0">
+        {/* Logo */}
+        <div className="flex justify-center mb-4">
+          <img src="/4F43E8E1-1786-4A37-93AF-2E381EE3B968.png" alt="সই Logo" className="h-20 w-auto" />
+        </div>
+        
         {/* header */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl sm:text-3xl font-bold text-primary">

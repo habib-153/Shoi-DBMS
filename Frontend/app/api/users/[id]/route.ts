@@ -29,6 +29,23 @@ export async function GET(
 
     if (userResults.length > 0) {
       const user = userResults[0];
+      
+      // Check privacy settings - if profile is private and viewer is not the owner
+      const { searchParams } = new URL(request.url);
+      const viewerId = searchParams.get('viewer_id');
+      
+      if (viewerId !== id) {
+        const [privacyResults] = await connection.execute(
+          'SELECT profile_visibility FROM privacy_settings WHERE user_id = ?',
+          [id]
+        ) as [RowDataPacket[], any];
+        
+        if (privacyResults.length > 0 && privacyResults[0].profile_visibility === 'private') {
+          await connection.end();
+          return NextResponse.json({ error: 'This profile is private' }, { status: 403 });
+        }
+      }
+      
       await connection.end();
       
       return NextResponse.json({

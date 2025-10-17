@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
 
     // Verify that the family member belongs to the user
     const familyMember = await query(
-      'SELECT * FROM family_members WHERE family_id = ? AND user_id = ? AND can_view_progress = 1',
+      'SELECT * FROM family_members WHERE family_id = ? AND user_id = ?',
       [family_id, user_id]
     );
 

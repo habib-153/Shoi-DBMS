@@ -4,498 +4,458 @@ import { useState, useEffect } from "react";
 import { useAuth, RequireAuth } from "@/lib/auth-context";
 import { 
   ClipboardList, 
-  Play, 
   CheckCircle, 
   Clock,
-  FileText,
-  TrendingUp,
-  AlertCircle,
-  ArrowRight,
-  BarChart3
+  Calendar,
+  User,
+  ChevronRight
 } from "lucide-react";
 
-interface Assessment {
+interface AssignedAssessment {
+  assignment_id: number;
   assessment_id: number;
-  name: string;
-  locale: string;
-  version: string;
-  guidance_TEXT: string;
+  assessment_name: string;
+  assessment_type: string;
+  guidance_text: string;
+  assigned_by_therapist_id: number;
+  therapist_name: string;
+  assigned_at: string;
+  due_date: string | null;
+  status: 'pending' | 'completed';
+  completed_at: string | null;
+  score: number | null;
+  total_questions: number;
+  answered_questions: number;
 }
 
-interface Question {
+interface AssessmentQuestion {
   question_id: number;
-  assessment_id: number;
   question_text: string;
-  response_type: string;
+  response_type: 'scale' | 'multiple_choice' | 'free_text' | 'yes_no';
+  scale_min: number | null;
+  scale_max: number | null;
+  options: string | null;
   position: number;
 }
 
 interface AssessmentResponse {
-  response_id: number;
-  assessment_id: number;
-  user_id: number;
-  submitted_at: string;
-  total_score: number;
-  prelim_insight: string;
-  assessment_name: string;
-  locale: string;
-  version: string;
-  answers: Array<{
-    response_answer_id: number;
-    question_id: number;
-    answer_value: string;
-    free_text: string;
-    question_text: string;
-    response_type: string;
-  }>;
+  question_id: number;
+  answer_value: number | null;
+  answer_text: string | null;
 }
 
 function AssessmentsPage() {
   const { user } = useAuth();
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
-  const [responses, setResponses] = useState<AssessmentResponse[]>([]);
+  const [activeTab, setActiveTab] = useState<'pending' | 'completed'>('pending');
+  const [assignments, setAssignments] = useState<AssignedAssessment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("available");
-  const [selectedAssessment, setSelectedAssessment] = useState<Assessment | null>(null);
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [answers, setAnswers] = useState<{[key: number]: any}>({});
-  const [takingAssessment, setTakingAssessment] = useState(false);
+  const [selectedAssignment, setSelectedAssignment] = useState<AssignedAssessment | null>(null);
+  const [questions, setQuestions] = useState<AssessmentQuestion[]>([]);
+  const [responses, setResponses] = useState<AssessmentResponse[]>([]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [showResults, setShowResults] = useState(false);
+  const [submittedScore, setSubmittedScore] = useState(0);
 
   useEffect(() => {
-    if (user) {
-      fetchAssessments();
-      fetchUserResponses();
+    if (user?.user_id) {
+      fetchAssignments();
     }
-  }, [user]);
+  }, [user?.user_id, activeTab]);
 
-  const fetchAssessments = async () => {
+  const fetchAssignments = async () => {
     try {
-      const response = await fetch("/api/assessments");
-      if (response.ok) {
-        const data = await response.json();
-        setAssessments(data.assessments || []);
+      setLoading(true);
+      const res = await fetch(`/api/users/${user?.user_id}/assigned-assessments?status=${activeTab}`);
+      const data = await res.json();
+      
+      if (data.success) {
+        setAssignments(data.assignments);
       }
     } catch (error) {
-      console.error("Error fetching assessments:", error);
+      console.error('Error fetching assignments:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchUserResponses = async () => {
-    if (!user) return;
-
+  const startAssessment = async (assignment: AssignedAssessment) => {
     try {
-      const response = await fetch(`/api/assessment-responses?userId=${user.user_id}`);
-      if (response.ok) {
-        const data = await response.json();
-        setResponses(data.responses || []);
+      setSelectedAssignment(assignment);
+      
+      // Fetch questions
+      const res = await fetch(`/api/assessment-types?assessment_id=${assignment.assessment_id}&include_questions=true`);
+      const data = await res.json();
+      
+      if (data.success && data.assessments.length > 0) {
+        const sortedQuestions = data.assessments[0].questions.sort((a: AssessmentQuestion, b: AssessmentQuestion) => 
+          a.position - b.position
+        );
+        setQuestions(sortedQuestions);
+        setResponses(sortedQuestions.map((q: AssessmentQuestion) => ({
+          question_id: q.question_id,
+          answer_value: null,
+          answer_text: null
+        })));
+        setCurrentQuestionIndex(0);
       }
     } catch (error) {
-      console.error("Error fetching user responses:", error);
+      console.error('Error starting assessment:', error);
     }
   };
 
-  const startAssessment = async (assessment: Assessment) => {
-    try {
-      const response = await fetch(`/api/assessments?id=${assessment.assessment_id}&includeQuestions=true`);
-      if (response.ok) {
-        const data = await response.json();
-        setSelectedAssessment(data.assessment);
-        setQuestions(data.questions || []);
-        setAnswers({});
-        setTakingAssessment(true);
-      }
-    } catch (error) {
-      console.error("Error loading assessment:", error);
+  const handleAnswer = (answer_value: number | null, answer_text: string | null) => {
+    const newResponses = [...responses];
+    newResponses[currentQuestionIndex] = {
+      ...newResponses[currentQuestionIndex],
+      answer_value,
+      answer_text
+    };
+    setResponses(newResponses);
+  };
+
+  const nextQuestion = () => {
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+    } else {
+      submitAssessment();
     }
   };
 
-  const handleAnswerChange = (questionId: number, value: any, freeText?: string) => {
-    setAnswers(prev => ({
-      ...prev,
-      [questionId]: {
-        answer_value: value,
-        free_text: freeText || null
-      }
-    }));
+  const previousQuestion = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(currentQuestionIndex - 1);
+    }
   };
 
   const submitAssessment = async () => {
-    if (!selectedAssessment || !user) return;
+    if (!selectedAssignment) return;
 
     try {
-      const answerArray = Object.entries(answers).map(([questionId, answer]) => ({
-        question_id: parseInt(questionId),
-        answer_value: answer.answer_value,
-        free_text: answer.free_text
-      }));
-
-      // Calculate basic score (this is simplified - real scoring would be more complex)
-      const totalScore = answerArray.reduce((sum, answer) => {
-        const numValue = parseInt(answer.answer_value);
-        return sum + (isNaN(numValue) ? 0 : numValue);
-      }, 0);
-
-      const response = await fetch("/api/assessment-responses", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          assessment_id: selectedAssessment.assessment_id,
-          user_id: user.user_id,
-          answers: answerArray,
-          total_score: totalScore,
-          prelim_insight: "Assessment completed successfully"
-        })
+      const res = await fetch(`/api/assessment-assignments/${selectedAssignment.assignment_id}/responses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ responses })
       });
 
-      if (response.ok) {
-        setTakingAssessment(false);
-        setSelectedAssessment(null);
-        fetchUserResponses();
-        setActiveTab("results");
-        alert("Assessment submitted successfully!");
-      } else {
-        alert("Failed to submit assessment");
+      const data = await res.json();
+      
+      if (data.success) {
+        setSubmittedScore(data.total_score);
+        setShowResults(true);
+        setTimeout(() => {
+          setSelectedAssignment(null);
+          setShowResults(false);
+          setActiveTab('completed');
+          fetchAssignments();
+        }, 4000);
       }
     } catch (error) {
-      console.error("Error submitting assessment:", error);
-      alert("Error submitting assessment");
+      console.error('Error submitting assessment:', error);
     }
   };
 
-  const renderQuestion = (question: Question) => {
-    const answerId = question.question_id;
-    const currentAnswer = answers[answerId];
+  const renderQuestion = () => {
+    if (!questions[currentQuestionIndex]) return null;
+    
+    const question = questions[currentQuestionIndex];
+    const currentResponse = responses[currentQuestionIndex];
 
-    switch (question.response_type) {
-      case "likert":
-        return (
-          <div className="space-y-3">
-            <p className="font-medium text-gray-800">{question.question_text}</p>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Strongly Disagree</span>
-              <div className="flex gap-2">
-                {[1, 2, 3, 4, 5].map((value) => (
-                  <label key={value} className="flex items-center">
-                    <input
-                      type="radio"
-                      name={`question_${question.question_id}`}
-                      value={value}
-                      checked={currentAnswer?.answer_value === value.toString()}
-                      onChange={(e) => handleAnswerChange(answerId, e.target.value)}
-                      className="mr-1"
-                    />
-                    <span className="text-sm">{value}</span>
-                  </label>
-                ))}
-              </div>
-              <span className="text-sm text-gray-600">Strongly Agree</span>
-            </div>
-          </div>
-        );
-
-      case "number":
-        return (
-          <div className="space-y-3">
-            <label className="font-medium text-gray-800">{question.question_text}</label>
-            <input
-              type="number"
-              value={currentAnswer?.answer_value || ""}
-              onChange={(e) => handleAnswerChange(answerId, e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2596be] focus:border-transparent"
-            />
-          </div>
-        );
-
-      case "text":
-        return (
-          <div className="space-y-3">
-            <label className="font-medium text-gray-800">{question.question_text}</label>
-            <textarea
-              value={currentAnswer?.free_text || ""}
-              onChange={(e) => handleAnswerChange(answerId, "", e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2596be] focus:border-transparent h-24 resize-none"
-              placeholder="Enter your response..."
-            />
-          </div>
-        );
-
-      case "bool":
-        return (
-          <div className="space-y-3">
-            <p className="font-medium text-gray-800">{question.question_text}</p>
-            <div className="flex gap-4">
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  name={`question_${question.question_id}`}
-                  value="true"
-                  checked={currentAnswer?.answer_value === "true"}
-                  onChange={(e) => handleAnswerChange(answerId, e.target.value)}
-                  className="mr-2"
-                />
-                Yes
-              </label>
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  name={`question_${question.question_id}`}
-                  value="false"
-                  checked={currentAnswer?.answer_value === "false"}
-                  onChange={(e) => handleAnswerChange(answerId, e.target.value)}
-                  className="mr-2"
-                />
-                No
-              </label>
-            </div>
-          </div>
-        );
-
-      default:
-        return (
-          <div className="space-y-3">
-            <label className="font-medium text-gray-800">{question.question_text}</label>
-            <input
-              type="text"
-              value={currentAnswer?.answer_value || ""}
-              onChange={(e) => handleAnswerChange(answerId, e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2596be] focus:border-transparent"
-            />
-          </div>
-        );
-    }
-  };
-
-  if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2596be] mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading assessments...</p>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between mb-4">
+          <span className="text-sm text-gray-500">
+            Question {currentQuestionIndex + 1} of {questions.length}
+          </span>
+          <div className="flex-1 mx-4 bg-gray-200 rounded-full h-2">
+            <div 
+              className="bg-blue-600 h-2 rounded-full transition-all"
+              style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }}
+            />
+          </div>
+        </div>
+
+        <h3 className="text-xl font-semibold text-gray-800">
+          {question.question_text}
+        </h3>
+
+        {question.response_type === 'scale' && (
+          <div className="space-y-4">
+            <input
+              type="range"
+              min={question.scale_min || 0}
+              max={question.scale_max || 10}
+              value={currentResponse.answer_value || question.scale_min || 0}
+              onChange={(e) => handleAnswer(parseInt(e.target.value), null)}
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+            />
+            <div className="flex justify-between text-sm text-gray-600">
+              <span>{question.scale_min || 0}</span>
+              <span className="font-semibold text-lg text-blue-600">
+                {currentResponse.answer_value !== null ? currentResponse.answer_value : (question.scale_min || 0)}
+              </span>
+              <span>{question.scale_max || 10}</span>
+            </div>
+          </div>
+        )}
+
+        {question.response_type === 'multiple_choice' && question.options && (
+          <div className="space-y-3">
+            {JSON.parse(question.options).map((option: string, index: number) => (
+              <button
+                key={index}
+                onClick={() => handleAnswer(index, option)}
+                className={`w-full p-4 text-left rounded-lg border-2 transition-all ${
+                  currentResponse.answer_value === index
+                    ? 'border-blue-600 bg-blue-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {question.response_type === 'free_text' && (
+          <textarea
+            value={currentResponse.answer_text || ''}
+            onChange={(e) => handleAnswer(null, e.target.value)}
+            className="w-full p-4 border-2 border-gray-200 rounded-lg focus:border-blue-600 focus:outline-none"
+            rows={4}
+            placeholder="Type your answer here..."
+          />
+        )}
+
+        {question.response_type === 'yes_no' && (
+          <div className="flex gap-4">
+            <button
+              onClick={() => handleAnswer(1, 'Yes')}
+              className={`flex-1 p-4 rounded-lg border-2 transition-all ${
+                currentResponse.answer_value === 1
+                  ? 'border-blue-600 bg-blue-50'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              Yes
+            </button>
+            <button
+              onClick={() => handleAnswer(0, 'No')}
+              className={`flex-1 p-4 rounded-lg border-2 transition-all ${
+                currentResponse.answer_value === 0
+                  ? 'border-blue-600 bg-blue-50'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              No
+            </button>
+          </div>
+        )}
+
+        <div className="flex justify-between pt-6">
+          <button
+            onClick={previousQuestion}
+            disabled={currentQuestionIndex === 0}
+            className="px-6 py-2 text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Previous
+          </button>
+          <button
+            onClick={nextQuestion}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            {currentQuestionIndex === questions.length - 1 ? 'Submit' : 'Next'}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  if (selectedAssignment && !showResults) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
+        <div className="max-w-3xl mx-auto">
+          <button
+            onClick={() => setSelectedAssignment(null)}
+            className="mb-4 text-gray-600 hover:text-gray-800"
+          >
+            ← Back to Assessments
+          </button>
+          <div className="bg-white rounded-xl shadow-lg p-8">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-gray-800">
+                {selectedAssignment.assessment_name}
+              </h2>
+              <p className="text-gray-600 mt-2">
+                {selectedAssignment.guidance_text}
+              </p>
+            </div>
+            
+            {renderQuestion()}
+          </div>
         </div>
       </div>
     );
   }
 
-  if (takingAssessment && selectedAssessment) {
+  if (showResults) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="container mx-auto px-4 py-8">
-          <div className="max-w-3xl mx-auto">
-            <div className="bg-white rounded-xl shadow-lg p-8">
-              <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-800 mb-2">{selectedAssessment.name}</h1>
-                {selectedAssessment.guidance_TEXT && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                    <div className="flex items-start gap-3">
-                      <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                      <p className="text-blue-800 text-sm">{selectedAssessment.guidance_TEXT}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-8">
-                {questions.map((question, index) => (
-                  <div key={question.question_id} className="border-b border-gray-200 pb-6 last:border-b-0">
-                    <div className="mb-4">
-                      <span className="inline-block bg-[#2596be] text-white text-xs font-medium px-2 py-1 rounded-full mb-2">
-                        Question {index + 1} of {questions.length}
-                      </span>
-                    </div>
-                    {renderQuestion(question)}
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-8 flex gap-4">
-                <button
-                  onClick={() => {
-                    setTakingAssessment(false);
-                    setSelectedAssessment(null);
-                  }}
-                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={submitAssessment}
-                  disabled={Object.keys(answers).length === 0}
-                  className="flex-1 bg-[#2596be] text-white px-6 py-3 rounded-lg hover:bg-[#1d7a99] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  <CheckCircle className="w-5 h-5" />
-                  Submit Assessment
-                </button>
-              </div>
-            </div>
-          </div>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-6">
+        <div className="bg-white rounded-xl shadow-lg p-12 text-center max-w-md">
+          <CheckCircle className="w-20 h-20 text-green-500 mx-auto mb-6" />
+          <h2 className="text-3xl font-bold text-gray-800 mb-4">
+            Assessment Complete!
+          </h2>
+          <p className="text-gray-600 mb-2">
+            Your score: <span className="font-bold text-2xl text-blue-600">{submittedScore}</span>
+          </p>
+          <p className="text-sm text-gray-500 mt-4">
+            Your therapist will review your responses shortly.
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">Mental Health Assessments</h1>
-          <p className="text-gray-600">Take assessments to better understand your mental health</p>
+          <h1 className="text-4xl font-bold text-gray-800 mb-2 flex items-center gap-3">
+            <ClipboardList className="w-10 h-10 text-blue-600" />
+            My Assessments
+          </h1>
+          <p className="text-gray-600">
+            Complete assessments assigned by your therapist to track your progress
+          </p>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex gap-4 mb-8">
+        {/* Tabs */}
+        <div className="flex gap-4 mb-6">
           <button
-            onClick={() => setActiveTab("available")}
-            className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-              activeTab === "available"
-                ? "bg-[#2596be] text-white"
-                : "bg-white text-gray-700 hover:bg-gray-50"
+            onClick={() => setActiveTab('pending')}
+            className={`px-6 py-3 rounded-lg font-medium transition-all ${
+              activeTab === 'pending'
+                ? 'bg-blue-600 text-white shadow-lg'
+                : 'bg-white text-gray-600 hover:bg-gray-50'
             }`}
           >
-            Available Assessments
+            <Clock className="inline w-5 h-5 mr-2" />
+            Pending
           </button>
           <button
-            onClick={() => setActiveTab("results")}
-            className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-              activeTab === "results"
-                ? "bg-[#2596be] text-white"
-                : "bg-white text-gray-700 hover:bg-gray-50"
+            onClick={() => setActiveTab('completed')}
+            className={`px-6 py-3 rounded-lg font-medium transition-all ${
+              activeTab === 'completed'
+                ? 'bg-blue-600 text-white shadow-lg'
+                : 'bg-white text-gray-600 hover:bg-gray-50'
             }`}
           >
-            My Results
+            <CheckCircle className="inline w-5 h-5 mr-2" />
+            Completed
           </button>
         </div>
 
-        {/* Available Assessments Tab */}
-        {activeTab === "available" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {assessments.map((assessment) => {
-              const hasCompleted = responses.some(r => r.assessment_id === assessment.assessment_id);
-              
-              return (
-                <div key={assessment.assessment_id} className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300">
-                  <div className="p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="p-2 bg-[#2596be]/10 rounded-lg">
-                        <ClipboardList className="w-6 h-6 text-[#2596be]" />
+        {/* Content */}
+        {loading ? (
+          <div className="bg-white rounded-xl shadow-lg p-12 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading assessments...</p>
+          </div>
+        ) : assignments.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-lg p-12 text-center">
+            <ClipboardList className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-800 mb-2">
+              No {activeTab} assessments
+            </h3>
+            <p className="text-gray-600">
+              {activeTab === 'pending' 
+                ? 'Your therapist hasn\'t assigned any assessments yet.'
+                : 'You haven\'t completed any assessments yet.'}
+            </p>
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 gap-6">
+            {assignments.map((assignment) => (
+              <div
+                key={assignment.assignment_id}
+                className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1">
+                    <h3 className="text-xl font-bold text-gray-800 mb-2">
+                      {assignment.assessment_name}
+                    </h3>
+                    <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                      {assignment.assessment_type}
+                    </span>
+                  </div>
+                  {assignment.status === 'completed' && (
+                    <CheckCircle className="w-6 h-6 text-green-500" />
+                  )}
+                </div>
+
+                <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                  {assignment.guidance_text}
+                </p>
+
+                <div className="space-y-2 mb-4">
+                  <div className="flex items-center text-sm text-gray-500">
+                    <User className="w-4 h-4 mr-2" />
+                    Assigned by: {assignment.therapist_name}
+                  </div>
+                  <div className="flex items-center text-sm text-gray-500">
+                    <Calendar className="w-4 h-4 mr-2" />
+                    {assignment.due_date 
+                      ? `Due: ${new Date(assignment.due_date).toLocaleDateString()}`
+                      : 'No due date'}
+                  </div>
+                </div>
+
+                {assignment.status === 'pending' ? (
+                  <>
+                    <div className="mb-4">
+                      <div className="flex justify-between text-sm text-gray-600 mb-1">
+                        <span>Progress</span>
+                        <span>{assignment.answered_questions} / {assignment.total_questions}</span>
                       </div>
-                      {hasCompleted && (
-                        <div className="flex items-center gap-1 text-green-600 text-sm">
-                          <CheckCircle className="w-4 h-4" />
-                          Completed
+                      <div className="bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="bg-blue-600 h-2 rounded-full"
+                          style={{ 
+                            width: `${(assignment.answered_questions / assignment.total_questions) * 100}%` 
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => startAssessment(assignment)}
+                      className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                    >
+                      {assignment.answered_questions > 0 ? 'Continue' : 'Start'} Assessment
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                  </>
+                ) : (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-green-800 font-medium">Completed</p>
+                        <p className="text-xs text-green-600">
+                          {new Date(assignment.completed_at!).toLocaleDateString()}
+                        </p>
+                      </div>
+                      {assignment.score !== null && (
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-green-800">{assignment.score}</p>
+                          <p className="text-xs text-green-600">Score</p>
                         </div>
                       )}
                     </div>
-
-                    <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                      {assessment.name}
-                    </h3>
-
-                    <div className="flex items-center gap-4 text-sm text-gray-600 mb-4">
-                      <span>Version {assessment.version}</span>
-                      <span>•</span>
-                      <span>{assessment.locale.toUpperCase()}</span>
-                    </div>
-
-                    {assessment.guidance_TEXT && (
-                      <p className="text-gray-600 text-sm mb-4 line-clamp-3">
-                        {assessment.guidance_TEXT}
-                      </p>
-                    )}
-
-                    <button
-                      onClick={() => startAssessment(assessment)}
-                      className="w-full bg-[#2596be] text-white px-4 py-2 rounded-lg hover:bg-[#1d7a99] transition-colors flex items-center justify-center gap-2 font-medium"
-                    >
-                      <Play className="w-4 h-4" />
-                      {hasCompleted ? "Retake Assessment" : "Start Assessment"}
-                    </button>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Results Tab */}
-        {activeTab === "results" && (
-          <div className="space-y-6">
-            {responses.length === 0 ? (
-              <div className="bg-white rounded-xl shadow-lg p-12 text-center">
-                <BarChart3 className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-600 mb-2">No assessment results yet</h3>
-                <p className="text-gray-500 mb-6">Complete an assessment to see your results here</p>
-                <button
-                  onClick={() => setActiveTab("available")}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-[#2596be] text-white rounded-lg hover:bg-[#1d7a99] transition-colors"
-                >
-                  <ArrowRight className="w-5 h-5" />
-                  View Available Assessments
-                </button>
+                )}
               </div>
-            ) : (
-              responses.map((response) => (
-                <div key={response.response_id} className="bg-white rounded-xl shadow-lg p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h3 className="text-xl font-semibold text-gray-800 mb-1">
-                        {response.assessment_name}
-                      </h3>
-                      <div className="flex items-center gap-4 text-sm text-gray-600">
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-4 h-4" />
-                          {new Date(response.submitted_at).toLocaleDateString()}
-                        </div>
-                        {response.total_score && (
-                          <div className="flex items-center gap-1">
-                            <TrendingUp className="w-4 h-4" />
-                            Score: {response.total_score}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {response.prelim_insight && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                      <div className="flex items-start gap-3">
-                        <FileText className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                        <div>
-                          <p className="text-blue-800 font-medium mb-1">Assessment Insights</p>
-                          <p className="text-blue-700 text-sm">{response.prelim_insight}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="space-y-3">
-                    <h4 className="font-medium text-gray-800">Your Responses:</h4>
-                    {response.answers.slice(0, 3).map((answer, index) => (
-                      <div key={answer.response_answer_id} className="text-sm">
-                        <p className="text-gray-700 font-medium">{answer.question_text}</p>
-                        <p className="text-gray-600 ml-4">
-                          {answer.free_text || answer.answer_value}
-                        </p>
-                      </div>
-                    ))}
-                    {response.answers.length > 3 && (
-                      <p className="text-sm text-gray-500 ml-4">
-                        And {response.answers.length - 3} more responses...
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        )}
-
-        {assessments.length === 0 && activeTab === "available" && (
-          <div className="bg-white rounded-xl shadow-lg p-12 text-center">
-            <ClipboardList className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-600 mb-2">No assessments available</h3>
-            <p className="text-gray-500">Assessments will be added by your healthcare provider</p>
+            ))}
           </div>
         )}
       </div>
@@ -503,7 +463,7 @@ function AssessmentsPage() {
   );
 }
 
-export default function AssessmentsWrapper() {
+export default function Page() {
   return (
     <RequireAuth>
       <AssessmentsPage />

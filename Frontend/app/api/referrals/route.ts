@@ -94,6 +94,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check user's privacy settings - if they have disabled referrals
+    const [privacySettings]: any = await query(
+      `SELECT allow_referrals FROM privacy_settings WHERE user_id = ?`,
+      [user_id]
+    );
+
+    if (privacySettings.length > 0 && privacySettings[0].allow_referrals === 0) {
+      return NextResponse.json(
+        { success: false, error: 'This user has disabled receiving referrals' },
+        { status: 403 }
+      );
+    }
+
     // If session_id provided, verify it exists and belongs to the referring therapist
     if (session_id) {
       const session: any[] = await query(
@@ -142,8 +155,15 @@ export async function POST(request: NextRequest) {
     console.log('INSERT parameters:', insertParams);
     console.log('Parameter types:', insertParams.map((p, i) => `[${i}]: ${typeof p} = ${p}`));
     
+    // Get next referral_id
+    const maxId: any = await query(
+      `SELECT IFNULL(MAX(referral_id), 0) + 1 as next_id FROM referrals`
+    );
+    const nextReferralId = maxId[0]?.next_id || 1;
+    
     const result: any = await query(
       `INSERT INTO referrals (
+        referral_id,
         user_id,
         referring_therapist_id,
         referred_to_therapist_id,
@@ -154,15 +174,15 @@ export async function POST(request: NextRequest) {
         current_medication,
         additional_notes,
         status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
-      insertParams
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+      [nextReferralId, ...insertParams]
     );
 
     console.log('INSERT result:', result);
     console.log('INSERT result type:', typeof result);
-    console.log('insertId:', result.insertId);
+    console.log('referralId:', nextReferralId);
     
-    const referralId = result.insertId;
+    const referralId = nextReferralId;
     console.log('referralId to use in SELECT:', referralId, 'type:', typeof referralId);
 
     // Fetch the created referral with full details
@@ -185,12 +205,18 @@ export async function POST(request: NextRequest) {
 
     // Send notification to the psychiatrist
     try {
+      const maxNotifId1: any = await query(
+        `SELECT IFNULL(MAX(notification_id), 0) + 1 as next_id FROM notifications`
+      );
+      const nextNotifId1 = maxNotifId1[0]?.next_id || 1;
+      
       await query(
         `INSERT INTO notifications 
-          (recipient_type, recipient_id, sender_type, sender_id, notification_type, 
+          (notification_id, recipient_type, recipient_id, sender_type, sender_id, notification_type, 
            title, message, related_id, action_url, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
         [
+          nextNotifId1,
           'therapist',
           referred_to_therapist_id,
           'therapist',
@@ -210,12 +236,18 @@ export async function POST(request: NextRequest) {
 
     // Send notification to the patient
     try {
+      const maxNotifId2: any = await query(
+        `SELECT IFNULL(MAX(notification_id), 0) + 1 as next_id FROM notifications`
+      );
+      const nextNotifId2 = maxNotifId2[0]?.next_id || 1;
+      
       await query(
         `INSERT INTO notifications 
-          (recipient_type, recipient_id, sender_type, sender_id, notification_type, 
+          (notification_id, recipient_type, recipient_id, sender_type, sender_id, notification_type, 
            title, message, related_id, action_url, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
         [
+          nextNotifId2,
           'user',
           user_id,
           'therapist',

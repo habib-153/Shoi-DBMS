@@ -22,6 +22,8 @@ interface Appointment {
   fees_max: number | null;
   payment_status?: 'pending' | 'completed' | 'failed';
   payment_id?: number;
+  has_session_notes?: number;
+  computed_status?: 'completed' | 'upcoming';
 }
 
 interface Analytics {
@@ -77,6 +79,7 @@ function DashboardContent() {
   const { user } = useAuth();
   const router = useRouter();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [allAppointments, setAllAppointments] = useState<Appointment[]>([]); // All appointments for stats
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [assignedResources, setAssignedResources] = useState<any[]>([]);
@@ -117,22 +120,28 @@ function DashboardContent() {
       const response = await fetch(`/api/users/${user.user_id || user.therapist_id}/appointments`);
       const data = await response.json();
       
+      console.log('Dashboard - All appointments:', data.appointments);
+      
       if (response.ok) {
-        // Filter only upcoming appointments (future dates with valid statuses)
-        const now = new Date();
+        // Store all appointments for stats calculation
+        setAllAppointments(data.appointments || []);
+        
+        // Filter only upcoming appointments for display
         const upcoming = (data.appointments || []).filter((apt: Appointment) => {
-          const aptDate = new Date(apt.start_time);
-          return aptDate > now && ['pending', 'confirmed', 'paid'].includes(apt.status);
+          return apt.computed_status === 'upcoming';
         });
+        console.log('Dashboard - Filtered upcoming appointments:', upcoming);
         setAppointments(upcoming);
       } else {
         toast.error("Failed to fetch appointments");
         setAppointments([]);
+        setAllAppointments([]);
       }
     } catch (error) {
       console.error("Error fetching appointments:", error);
       toast.error("Error loading appointments");
       setAppointments([]);
+      setAllAppointments([]);
     }
   };
 
@@ -142,6 +151,8 @@ function DashboardContent() {
     try {
       const response = await fetch(`/api/users/${user.user_id || user.therapist_id}/analytics`);
       const data = await response.json();
+      
+      console.log('Dashboard - Analytics data:', data);
       
       if (response.ok) {
         setAnalytics(data);
@@ -344,7 +355,7 @@ function DashboardContent() {
               <div>
                 <p className="text-sm text-muted-foreground">Total Appointments</p>
                 <p className="text-2xl font-bold text-foreground">
-                  {analytics?.appointments?.total_appointments || appointments.length}
+                  {allAppointments.length}
                 </p>
               </div>
               <Calendar className="w-8 h-8 text-primary" />
@@ -355,7 +366,9 @@ function DashboardContent() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Completed Sessions</p>
-                <p className="text-2xl font-bold text-foreground">{analytics?.appointments?.completed_appointments || 0}</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {allAppointments.filter(apt => apt.computed_status === 'completed' || apt.has_session_notes === 1).length}
+                </p>
               </div>
               <Check className="w-8 h-8 text-green-600" />
             </div>
@@ -365,78 +378,94 @@ function DashboardContent() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Upcoming Appointments</p>
-                <p className="text-2xl font-bold text-foreground">{analytics?.appointments?.upcoming_appointments || 0}</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {allAppointments.filter(apt => apt.computed_status === 'upcoming').length}
+                </p>
               </div>
               <Clock className="w-8 h-8 text-yellow-600" />
             </div>
           </div>
         </div>
 
-        {/* Health Analytics */}
+        {/* Health Analytics - Only show if there's data */}
         {analytics && (
+          analytics.assessments?.total_assessments > 0 || 
+          analytics.symptoms?.recent_symptoms?.length > 0 || 
+          analytics.health_trends?.length > 0
+        ) && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             <div className="card-modern border-0 p-6">
               <h3 className="text-lg font-semibold text-foreground mb-4">Health Overview</h3>
               <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Recent Mood Trend</span>
-                  <div className="flex items-center gap-2">
-                    {analytics.mood_trend?.recent_avg && analytics.mood_trend?.previous_avg && (
-                      <Badge className={
-                        analytics.mood_trend.recent_avg > analytics.mood_trend.previous_avg 
-                          ? 'bg-green-100 text-green-800' 
-                          : analytics.mood_trend.recent_avg < analytics.mood_trend.previous_avg
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }>
-                        {analytics.mood_trend.recent_avg > analytics.mood_trend.previous_avg 
-                          ? '↗ Improving' 
-                          : analytics.mood_trend.recent_avg < analytics.mood_trend.previous_avg
-                          ? '↘ Declining'
-                          : '→ Stable'}
-                      </Badge>
-                    )}
+                {analytics.mood_trend?.recent_avg > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Recent Mood Trend</span>
+                    <div className="flex items-center gap-2">
+                      {analytics.mood_trend?.recent_avg && analytics.mood_trend?.previous_avg && (
+                        <Badge className={
+                          analytics.mood_trend.recent_avg > analytics.mood_trend.previous_avg 
+                            ? 'bg-green-100 text-green-800' 
+                            : analytics.mood_trend.recent_avg < analytics.mood_trend.previous_avg
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }>
+                          {analytics.mood_trend.recent_avg > analytics.mood_trend.previous_avg 
+                            ? '↗ Improving' 
+                            : analytics.mood_trend.recent_avg < analytics.mood_trend.previous_avg
+                            ? '↘ Declining'
+                            : '→ Stable'}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Total Assessments</span>
-                  <span className="text-lg font-semibold text-foreground">{analytics.assessments?.total_assessments || 0}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Recent Symptoms Logged</span>
-                  <span className="text-lg font-semibold text-foreground">{analytics.symptoms?.recent_symptoms?.length || 0}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Tracking Days</span>
-                  <span className="text-lg font-semibold text-foreground">{analytics.symptoms?.total_tracking_days || 0}</span>
-                </div>
+                )}
+                {analytics.assessments?.total_assessments > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Total Assessments</span>
+                    <span className="text-lg font-semibold text-foreground">{analytics.assessments.total_assessments}</span>
+                  </div>
+                )}
+                {analytics.symptoms?.recent_symptoms?.length > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Recent Symptoms Logged</span>
+                    <span className="text-lg font-semibold text-foreground">{analytics.symptoms.recent_symptoms.length}</span>
+                  </div>
+                )}
+                {analytics.symptoms?.total_tracking_days > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Tracking Days</span>
+                    <span className="text-lg font-semibold text-foreground">{analytics.symptoms.total_tracking_days}</span>
+                  </div>
+                )}
               </div>
             </div>
 
             <div className="card-modern border-0 p-6">
               <h3 className="text-lg font-semibold text-foreground mb-4">Recent Health Data</h3>
               <div className="space-y-3">
-                {analytics.health_trends?.slice(0, 3).map((trend, index) => (
-                  <div key={index} className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">
-                        {dayjs(trend.log_date).format('MMM DD')}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Mood: {trend.mood_score}/10 | Sleep: {trend.sleep_hours}h
-                      </p>
+                {analytics.health_trends?.length > 0 ? (
+                  analytics.health_trends.slice(0, 3).map((trend, index) => (
+                    <div key={index} className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          {dayjs(trend.log_date).format('MMM DD')}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Mood: {trend.mood_score}/10 | Sleep: {trend.sleep_hours}h
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <Badge className={
+                          trend.anxiety_level <= 3 ? 'bg-green-100 text-green-800' :
+                          trend.anxiety_level <= 6 ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-red-100 text-red-800'
+                        }>
+                          Anxiety: {trend.anxiety_level}/10
+                        </Badge>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <Badge className={
-                        trend.anxiety_level <= 3 ? 'bg-green-100 text-green-800' :
-                        trend.anxiety_level <= 6 ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-red-100 text-red-800'
-                      }>
-                        Anxiety: {trend.anxiety_level}/10
-                      </Badge>
-                    </div>
-                  </div>
-                )) || (
+                  ))
+                ) : (
                   <p className="text-center text-muted-foreground py-4">No health data available</p>
                 )}
               </div>
@@ -624,7 +653,7 @@ function DashboardContent() {
                 <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
                   <NotepadText className="w-5 h-5 text-green-600" />
                 </div>
-                <h2 className="text-xl font-bold text-foreground">Session Notes</h2>
+                <h2 className="text-xl font-bold text-foreground">Therapy Records</h2>
               </div>
               {sessionNotes.length > 0 && (
                 <Link href="/session-notes" className="text-green-600 hover:text-green-700 font-medium text-sm">
@@ -672,8 +701,8 @@ function DashboardContent() {
             ) : (
               <div className="text-center py-8">
                 <NotepadText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-sm text-gray-500">No session notes available</p>
-                <p className="text-xs text-gray-400 mt-1">Your therapist will share session notes after your appointments</p>
+                <p className="text-sm text-gray-500">No therapy records available</p>
+                <p className="text-xs text-gray-400 mt-1">Your therapist will share therapy records after your appointments</p>
               </div>
             )}
           </div>

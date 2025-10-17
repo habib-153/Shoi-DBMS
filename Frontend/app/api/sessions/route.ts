@@ -100,16 +100,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create session
-    const result: any = await query(
-      `INSERT INTO sessions (appointment_id, session_date, duration_min)
-       VALUES (?, ?, ?)`,
-      [appointment_id, session_date, duration_min]
+    // Get next session_id (not auto_increment)
+    const maxSessionId: any = await query(
+      `SELECT IFNULL(MAX(session_id), 0) + 1 as next_id FROM sessions`
+    );
+    const nextSessionId = maxSessionId[0]?.next_id || 1;
+    
+    // Create a session
+    const result = await query(
+      `INSERT INTO sessions (session_id, appointment_id, session_date, duration_min)
+       VALUES (?, ?, ?, ?)`,
+      [nextSessionId, appointment_id, session_date, duration_min]
     );
 
     return NextResponse.json({
       success: true,
-      session_id: result.insertId || null,
+      session_id: nextSessionId,
       message: 'Session created successfully'
     });
 

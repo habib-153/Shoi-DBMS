@@ -90,12 +90,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check recipient's privacy settings for appointment reminders
+    if (notification_type === 'appointment') {
+      const privacyCheck: any = await query(
+        `SELECT appointment_reminders FROM privacy_settings WHERE user_id = ?`,
+        [recipient_type === 'user' ? recipient_id : null]
+      );
+      
+      if (privacyCheck.length > 0 && privacyCheck[0].appointment_reminders === 0) {
+        return NextResponse.json({
+          success: false,
+          error: 'User has disabled appointment reminders'
+        }, { status: 403 });
+      }
+    }
+
+    // Get next notification_id
+    const maxId: any = await query(
+      `SELECT IFNULL(MAX(notification_id), 0) + 1 as next_id FROM notifications`
+    );
+    const nextNotificationId = maxId[0]?.next_id || 1;
+
     const result: any = await query(
       `INSERT INTO notifications 
-        (recipient_type, recipient_id, sender_type, sender_id, notification_type, 
+        (notification_id, recipient_type, recipient_id, sender_type, sender_id, notification_type, 
          title, message, related_id, action_url, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
       [
+        nextNotificationId,
         recipient_type,
         recipient_id,
         sender_type || 'system',
@@ -110,7 +132,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      notification_id: result.insertId || result[0]?.insertId,
+      notification_id: nextNotificationId,
       message: 'Notification created successfully'
     });
 

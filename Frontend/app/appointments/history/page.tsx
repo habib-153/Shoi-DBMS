@@ -15,6 +15,9 @@ interface Appointment {
   fees_max: number;
   payment_id: number | null;
   payment_status: string | null;
+  payment_amount?: number;
+  has_session_notes?: number;
+  computed_status?: 'completed' | 'upcoming';
 }
 
 function AppointmentHistory() {
@@ -85,6 +88,21 @@ function AppointmentHistory() {
       const response = await fetch(`/api/users/${user.user_id || user.therapist_id}/appointments`);
       if (response.ok) {
         const data = await response.json();
+        console.log('Fetched appointments:', data.appointments);
+        console.log('Sample appointment:', data.appointments?.[0]);
+        
+        // Debug payment amounts
+        const paidAppointments = (data.appointments || []).filter(apt => 
+          apt.payment_status === 'completed' || apt.payment_status === 'paid'
+        );
+        console.log('Paid appointments:', paidAppointments);
+        console.log('Payment amounts:', paidAppointments.map(apt => ({
+          id: apt.appointment_id,
+          payment_amount: apt.payment_amount,
+          fees_max: apt.fees_max,
+          fees_min: apt.fees_min
+        })));
+        
         setAppointments(data.appointments || []);
       } else {
         console.error('Failed to fetch appointments');
@@ -167,8 +185,10 @@ function AppointmentHistory() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed': return 'bg-green-100 text-green-800';
+      case 'upcoming': return 'bg-blue-100 text-blue-800';
       case 'pending': return 'bg-yellow-100 text-yellow-800';
       case 'paid': return 'bg-blue-100 text-blue-800';
+      case 'cancelled': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -264,19 +284,24 @@ function AppointmentHistory() {
           </div>
           <div className="bg-white p-6 rounded-xl shadow-sm border">
             <div className="text-2xl font-bold text-green-600">
-              {(appointments || []).filter(apt => apt.status === 'completed').length}
+              {(appointments || []).filter(apt => apt.computed_status === 'completed' || apt.has_session_notes === 1).length}
             </div>
             <div className="text-gray-600 text-sm">Completed</div>
           </div>
           <div className="bg-white p-6 rounded-xl shadow-sm border">
             <div className="text-2xl font-bold text-blue-600">
-              {(appointments || []).filter(apt => apt.status === 'pending' || apt.status === 'paid').length}
+              {(appointments || []).filter(apt => apt.computed_status === 'upcoming').length}
             </div>
             <div className="text-gray-600 text-sm">Upcoming</div>
           </div>
           <div className="bg-white p-6 rounded-xl shadow-sm border">
             <div className="text-2xl font-bold text-[#2596be]">
-              ৳{(appointments || []).reduce((total, apt) => total + (apt.fees_max || apt.fees_min || 0), 0).toLocaleString()}
+              ৳{Math.round((appointments || [])
+                .filter(apt => apt.payment_status === 'completed' || apt.payment_status === 'paid')
+                .reduce((total, apt) => {
+                  const amount = Number(apt.payment_amount) || Number(apt.fees_max) || Number(apt.fees_min) || 0;
+                  return total + amount;
+                }, 0)).toLocaleString('en-US')}
             </div>
             <div className="text-gray-600 text-sm">Total Spent</div>
           </div>
@@ -295,15 +320,15 @@ function AppointmentHistory() {
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <h3 className="text-lg font-semibold text-gray-900">{appointment.therapist_name}</h3>
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(appointment.status)}`}>
-                          {appointment.status}
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(appointment.computed_status || appointment.status)}`}>
+                          {appointment.has_session_notes === 1 ? 'Completed' : (appointment.computed_status || appointment.status)}
                         </span>
                         {/* Payment Status Badge */}
                         {appointment.payment_status && (
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                             appointment.payment_status === 'completed' || appointment.payment_status === 'paid' 
                               ? 'bg-green-100 text-green-800' 
-                              : 'bg-orange-100 text-orange-800'
+                              : 'bg-[#2596be]/10 text-[#2596be]'
                           }`}>
                             {appointment.payment_status === 'completed' || appointment.payment_status === 'paid' 
                               ? 'Paid' 
@@ -330,7 +355,9 @@ function AppointmentHistory() {
                     </div>
                   </div>
                     <div className="text-right">
-                      <div className="text-lg font-semibold text-gray-900 mb-2">৳{appointment.fees_max || appointment.fees_min || 0}</div>
+                      <div className="text-lg font-semibold text-gray-900 mb-2">
+                        ৳{appointment.payment_amount || appointment.fees_max || appointment.fees_min || 0}
+                      </div>
                       
                       {/* Payment status and actions */}
                       <div className="flex flex-col items-end gap-2">

@@ -84,15 +84,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get next resource_id (manual ID generation)
+    const maxIdResult: any = await query(
+      `SELECT MAX(resource_id) as max_id FROM resources`
+    );
+    const currentMaxId = maxIdResult[0]?.max_id || 0;
+    const next_resource_id = currentMaxId + 1;
+
     const result = await query(
-      `INSERT INTO resources (title, type, author_or_source, description, link)
-       VALUES (?, ?, ?, ?, ?)`,
-      [title, type, author_or_source || null, description || null, link || null]
+      `INSERT INTO resources (resource_id, title, type, author_or_source, description, link)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [next_resource_id, title, type, author_or_source || null, description || null, link || null]
     );
 
     return NextResponse.json({
       success: true,
-      resource_id: (result as any).insertId,
+      resource_id: next_resource_id,
       message: 'Resource created successfully'
     });
 

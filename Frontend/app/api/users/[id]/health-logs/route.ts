@@ -112,18 +112,24 @@ export async function POST(
         log_date: today
       });
     } else {
+      // Get next log_id
+      const maxLogId: any = await query(
+        `SELECT IFNULL(MAX(log_id), 0) + 1 as next_id FROM user_health_logs`
+      );
+      const nextLogId = maxLogId[0]?.next_id || 1;
+      
       // Create new log
       const result: any = await query(
         `INSERT INTO user_health_logs 
-          (user_id, log_date, mood_score, sleep_hours, anxiety_level, journal_entry)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [id, today, mood_score, sleep_hours, anxiety_level, journal_entry || null]
+          (log_id, user_id, log_date, mood_score, sleep_hours, anxiety_level, journal_entry)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [nextLogId, id, today, mood_score, sleep_hours, anxiety_level, journal_entry || null]
       );
 
       return NextResponse.json({
         success: true,
         message: 'Health log created successfully',
-        log_id: result.insertId || result[0]?.insertId,
+        log_id: nextLogId,
         log_date: today
       });
     }

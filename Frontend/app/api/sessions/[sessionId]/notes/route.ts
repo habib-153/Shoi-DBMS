@@ -97,12 +97,19 @@ export async function POST(
       );
       message = 'Session note updated successfully';
     } else {
+      // Get next note_id
+      const maxNoteId: any = await query(
+        `SELECT IFNULL(MAX(note_id), 0) + 1 as next_id FROM session_notes`
+      );
+      const nextNoteId = maxNoteId[0]?.next_id || 1;
+      
       // Create a new session note
       const result: any = await query(
         `INSERT INTO session_notes 
-          (session_id, summary, homework, therapist_private_notes, visible_to_user)
-         VALUES (?, ?, ?, ?, ?)`,
+          (note_id, session_id, summary, homework, therapist_private_notes, visible_to_user)
+         VALUES (?, ?, ?, ?, ?, ?)`,
         [
+          nextNoteId,
           sessionId,
           summary || null,
           homework || null,
@@ -110,7 +117,7 @@ export async function POST(
           visible_to_user !== undefined ? visible_to_user : 1 // Default to visible
         ]
       );
-      noteId = result.insertId || result[0]?.insertId;
+      noteId = nextNoteId;
       message = 'Session note created successfully';
     }
 
@@ -144,6 +151,11 @@ export async function GET(
 ) {
   try {
     const { sessionId } = await params;
+    
+    // Get viewer info from query params
+    const { searchParams } = new URL(request.url);
+    const viewerType = searchParams.get('viewer_type'); // 'user' or 'therapist'
+    const viewerId = searchParams.get('viewer_id');
 
     const notes = await query(
       `SELECT 
@@ -177,6 +189,24 @@ export async function GET(
        ORDER BY sn.created_at DESC`,
       [sessionId]
     );
+
+    // Check shield mode for users
+    if (viewerType === 'user' && viewerId && notes.length > 0) {
+      const userId = notes[0].user_id;
+      const [privacySettings]: any = await query(
+        `SELECT shield_mode FROM privacy_settings WHERE user_id = ?`,
+        [userId]
+      );
+      
+      if (privacySettings.length > 0 && privacySettings[0].shield_mode === 1) {
+        // Mask sensitive information in shield mode
+        notes.forEach((note: any) => {
+          if (note.therapist_private_notes) {
+            note.therapist_private_notes = '[Protected by Shield Mode]';
+          }
+        });
+      }
+    }
 
     return NextResponse.json({
       success: true,

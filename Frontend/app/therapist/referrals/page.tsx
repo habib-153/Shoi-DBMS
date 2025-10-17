@@ -66,14 +66,31 @@ export default function ReferralsPage() {
   const [expandedReferral, setExpandedReferral] = useState<number | null>(null);
   const [responseNotes, setResponseNotes] = useState('');
   const [processingReferral, setProcessingReferral] = useState<number | null>(null);
+  const [isPsychiatrist, setIsPsychiatrist] = useState(false);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
     if (userData) {
       const user = JSON.parse(userData);
       setTherapist(user);
+      
+      // Check if therapist is a psychiatrist (specialty_id = 2)
+      checkIfPsychiatrist(user.therapist_id);
     }
   }, []);
+
+  const checkIfPsychiatrist = async (therapistId: number) => {
+    try {
+      const response = await fetch(`/api/therapist/${therapistId}/specialties`);
+      const data = await response.json();
+      
+      // Check if any specialty has specialty_id = 2 (Psychiatrist)
+      const hasPsychiatry = data.specialties?.some((s: any) => s.specialty_id === 2);
+      setIsPsychiatrist(hasPsychiatry);
+    } catch (error) {
+      console.error('Error checking specialties:', error);
+    }
+  };
 
   useEffect(() => {
     if (therapist?.therapist_id) {
@@ -237,16 +254,18 @@ export default function ReferralsPage() {
           >
             Referrals Sent ({stats?.total || 0})
           </button>
-          <button
-            onClick={() => setViewType('received')}
-            className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-              viewType === 'received'
-                ? 'bg-[#2596be] text-white'
-                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-            }`}
-          >
-            Referrals Received ({stats?.pending || 0} pending)
-          </button>
+          {isPsychiatrist && (
+            <button
+              onClick={() => setViewType('received')}
+              className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+                viewType === 'received'
+                  ? 'bg-[#2596be] text-white'
+                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              Referrals Received ({stats?.pending || 0} pending)
+            </button>
+          )}
         </div>
 
         {/* Stats */}
