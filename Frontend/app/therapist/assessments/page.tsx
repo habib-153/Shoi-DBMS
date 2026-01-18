@@ -224,7 +224,7 @@ function TherapistAssessmentsPage() {
             <Link href="/therapist/assessments/create">
               <button className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition">
                 <Plus className="w-4 h-4" />
-                Create Custom
+                Create
               </button>
             </Link>
           </div>

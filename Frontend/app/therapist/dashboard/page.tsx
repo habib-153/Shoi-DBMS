@@ -313,7 +313,7 @@ export default function TherapistDashboard() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           <div className="card-modern border-0 p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -331,6 +331,21 @@ export default function TherapistDashboard() {
                 <p className="text-2xl font-bold text-foreground">{stats.totalPatients}</p>
               </div>
               <Users className="w-8 h-8 text-green-600" />
+            </div>
+          </div>
+          
+          <div className="card-modern border-0 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Average Rating</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-2xl font-bold text-foreground">{stats.averageRating || '0.0'}</p>
+                  <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
+                </div>
+              </div>
+              <div className="flex flex-col items-center">
+                <TrendingUp className="w-8 h-8 text-yellow-600" />
+              </div>
             </div>
           </div>
           

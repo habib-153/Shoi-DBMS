@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Star, MapPin, Clock, Languages, GraduationCap, Award, Calendar, ArrowRight, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { RatingDisplay } from "@/components/StarRating";
 import { toast } from "sonner";
 import dayjs from "dayjs";
 
@@ -349,10 +350,7 @@ export default function Experts() {
                   <p className="text-[#2596be] font-medium mb-2">{therapist.qualifications || "Licensed Therapist"}</p>
                   
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="flex items-center">
-                      <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                      <span className="ml-1 text-sm font-medium">{therapist.rating || 4.5}</span>
-                    </div>
+                    <RatingDisplay rating={therapist.rating || 4.5} size={16} showValue={true} />
                     <span className="text-gray-300">•</span>
                     <span className="text-sm text-gray-600">Licensed Professional</span>
                   </div>

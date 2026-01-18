@@ -20,6 +20,7 @@ export async function GET(
         sn.created_at,
         s.session_date,
         s.duration_min,
+        s.rating_by_user,
         s.appointment_id,
         a.appointment_id,
         a.user_id,

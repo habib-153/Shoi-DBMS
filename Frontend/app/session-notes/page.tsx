@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { StarRating } from "@/components/StarRating";
 import { toast } from "sonner";
 import dayjs from "dayjs";
 
@@ -46,6 +47,7 @@ interface SessionNote {
   end_time?: string;
   visible_to_user: boolean;
   created_at: string;
+  rating_by_user?: number | null;
 }
 
 interface Referral {
@@ -105,6 +107,7 @@ function SessionNotesPage() {
   const [selectedSlot, setSelectedSlot] = useState<{start: string; end: string} | null>(null);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [isBooking, setIsBooking] = useState(false);
+  const [submittingRating, setSubmittingRating] = useState<number | null>(null);
 
   useEffect(() => {
     if (user?.user_id) {
@@ -374,6 +377,48 @@ function SessionNotesPage() {
     }
   };
 
+  const handleRatingSubmit = async (sessionId: number, rating: number) => {
+    if (!user?.user_id) {
+      toast.error("You must be logged in to rate a session");
+      return;
+    }
+
+    setSubmittingRating(sessionId);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/rate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          rating: rating,
+          user_id: user.user_id,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to submit rating");
+      }
+
+      toast.success(`Thank you for rating this session ${rating} stars!`);
+      
+      // Update the local state to reflect the rating
+      setSessionNotes(prevNotes => 
+        prevNotes.map(note => 
+          note.session_id === sessionId 
+            ? { ...note, rating_by_user: rating }
+            : note
+        )
+      );
+      
+    } catch (error: any) {
+      console.error("Error submitting rating:", error);
+      toast.error(error.message || "Failed to submit rating");
+    } finally {
+      setSubmittingRating(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
@@ -500,6 +545,45 @@ function SessionNotesPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Rating Section */}
+                <div className="mt-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Star className="w-5 h-5 text-yellow-500" />
+                    <h4 className="font-semibold text-gray-800">Rate this Session</h4>
+                  </div>
+                  {note.rating_by_user !== null && note.rating_by_user !== undefined ? (
+                    <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                      <p className="text-sm text-gray-600 mb-2">Your rating:</p>
+                      <StarRating 
+                        rating={note.rating_by_user} 
+                        readonly={true}
+                        size={24}
+                        showValue={true}
+                      />
+                      <p className="text-xs text-gray-500 mt-2">Thank you for your feedback!</p>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <p className="text-sm text-gray-600 mb-3">
+                        How would you rate your experience with Dr. {note.therapist_name}?
+                      </p>
+                      <StarRating
+                        rating={0}
+                        onRatingChange={(rating) => handleRatingSubmit(note.session_id, rating)}
+                        readonly={submittingRating === note.session_id}
+                        size={28}
+                        showValue={false}
+                      />
+                      {submittingRating === note.session_id && (
+                        <div className="text-sm text-blue-600 mt-2 flex items-center gap-2">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                          Submitting your rating...
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 {/* Footer */}
                 <div className="mt-4 pt-4 border-t border-gray-200">

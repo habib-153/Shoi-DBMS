@@ -108,6 +108,22 @@ export default function TherapistSessionsPage() {
       }
       grouped[session.user_id].sessions.push(session);
     });
+    
+    // Sort sessions within each patient group
+    // Priority: 1. Pending notes first (has_notes === 0), 2. Then by date (latest first)
+    Object.keys(grouped).forEach(userId => {
+      grouped[Number(userId)].sessions.sort((a, b) => {
+        // First sort by note status (pending notes first)
+        if (a.has_notes === 0 && b.has_notes > 0) return -1;
+        if (a.has_notes > 0 && b.has_notes === 0) return 1;
+        
+        // Then sort by date (latest first)
+        const dateA = new Date(a.start_time || a.session_date).getTime();
+        const dateB = new Date(b.start_time || b.session_date).getTime();
+        return dateB - dateA; // Descending order (latest first)
+      });
+    });
+    
     setGroupedSessions(grouped);
     
     // Auto-expand all patients initially
@@ -417,7 +433,22 @@ export default function TherapistSessionsPage() {
               <p className="text-gray-500 text-sm mt-2">Sessions are created when appointments are completed</p>
             </div>
           ) : (
-            Object.entries(groupedSessions).map(([userId, patientData]) => (
+            Object.entries(groupedSessions)
+              .sort(([, dataA], [, dataB]) => {
+                // Sort patients by pending notes count (more pending notes first)
+                const pendingA = dataA.sessions.filter(s => s.has_notes === 0).length;
+                const pendingB = dataB.sessions.filter(s => s.has_notes === 0).length;
+                
+                if (pendingA !== pendingB) {
+                  return pendingB - pendingA; // More pending notes first
+                }
+                
+                // If same pending count, sort by latest session date
+                const latestA = Math.max(...dataA.sessions.map(s => new Date(s.start_time || s.session_date).getTime()));
+                const latestB = Math.max(...dataB.sessions.map(s => new Date(s.start_time || s.session_date).getTime()));
+                return latestB - latestA;
+              })
+              .map(([userId, patientData]) => (
               <div key={userId} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div 
                   onClick={() => togglePatientExpand(Number(userId))}
