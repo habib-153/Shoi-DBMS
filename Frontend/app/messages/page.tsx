@@ -440,9 +440,9 @@ export default function MessagesPage() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-gradient-modern flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#2596be] mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading messages...</p>
         </div>
       </div>
@@ -453,7 +453,7 @@ export default function MessagesPage() {
   const userId = user?.role === 'therapist' ? user.therapist_id : user?.user_id;
   if (!user || (user.role !== 'user' && user.role !== 'therapist') || !userId) {
     return (
-      <div className="min-h-screen bg-gradient-modern flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <MessageCircle className="h-16 w-16 text-muted-foreground/50 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-foreground mb-2">Please log in</h2>
@@ -467,16 +467,8 @@ export default function MessagesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-[#2596be]/5 relative overflow-hidden">
-      {/* Floating elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-[8%] w-32 h-32 bg-[#2596be]/5 rounded-full animate-float blur-3xl"></div>
-        <div className="absolute top-1/3 right-[12%] w-24 h-24 bg-[#2596be]/8 rounded-full animate-float-delayed blur-2xl"></div>
-        <div className="absolute bottom-1/4 left-[15%] w-20 h-20 bg-[#2596be]/6 rounded-full animate-float-slow blur-xl"></div>
-        <div className="absolute top-1/2 right-[20%] w-16 h-16 bg-[#2596be]/10 rounded-full animate-pulse blur-lg"></div>
-      </div>
-
-      <div className="max-w-7xl mx-auto p-4 sm:p-6 relative z-10">
+    <div className="min-h-screen bg-white">
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
         {/* Header */}
         <div className="mb-8">
           {/* Badge */}
@@ -500,7 +492,7 @@ export default function MessagesPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-[700px]">
           <Card className="lg:col-span-1 card-modern border-0 shadow-xl shadow-[#2596be]/5 hover:shadow-[#2596be]/10 transition-all duration-300">
-            <CardHeader className="bg-gradient-to-r from-[#2596be]/5 to-transparent border-b border-[#2596be]/10">
+            <CardHeader className="bg-[#2596be]/5 border-b border-[#2596be]/10">
               <CardTitle className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 bg-[#2596be]/10 rounded-xl flex items-center justify-center">
@@ -591,7 +583,7 @@ export default function MessagesPage() {
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-gradient-to-br from-[#2596be] to-[#1d7a99] rounded-full flex items-center justify-center shadow-md shadow-[#2596be]/20 group-hover:shadow-lg group-hover:shadow-[#2596be]/30 transition-all duration-300">
+                          <div className="w-10 h-10 bg-[#2596be] rounded-full flex items-center justify-center shadow-md shadow-[#2596be]/20 group-hover:shadow-lg group-hover:shadow-[#2596be]/30 transition-all duration-300">
                             <UserRound className="h-5 w-5 text-white" />
                           </div>
                           <div>
@@ -692,7 +684,7 @@ export default function MessagesPage() {
 
                   {/* Therapist Action Buttons */}
                   {user?.role === 'therapist' && selectedConversation && (
-                    <div className="border-t border-[#2596be]/10 p-3 bg-gradient-to-r from-[#2596be]/5 to-transparent">
+                    <div className="border-t border-[#2596be]/10 p-3 bg-[#2596be]/5">
                       <div className="flex gap-2 flex-wrap">
                         <Button
                           onClick={() => {
@@ -740,7 +732,7 @@ export default function MessagesPage() {
                     </div>
                   )}
 
-                  <div className="border-t border-[#2596be]/10 p-4 bg-gradient-to-r from-[#2596be]/5 to-transparent">
+                  <div className="border-t border-[#2596be]/10 p-4 bg-[#2596be]/5">
                     <div className="flex gap-3">
                       <div className="flex-1 relative">
                         <Input

@@ -82,7 +82,7 @@ export default function Navigation() {
             </Link>
 
             <div className="hidden md:flex items-center gap-6">
-              <Link href="/#impact" className="nav-link group">
+              <Link href="/impact" className="nav-link group">
                 Impact
               </Link>
               <Link href="/about" className="nav-link group">
@@ -250,7 +250,7 @@ export default function Navigation() {
         {open && (
           <div className="md:hidden bg-[#2596be]/98 backdrop-blur-md border-t border-white/10">
             <div className="px-4 pt-4 pb-6 space-y-3">
-              <Link href="/#impact" className="block px-3 py-2 text-white hover:bg-white/10 rounded-lg transition-colors duration-200">
+              <Link href="/impact" className="block px-3 py-2 text-white hover:bg-white/10 rounded-lg transition-colors duration-200">
                 Impact
               </Link>
               <Link href="/about" className="block px-3 py-2 text-white hover:bg-white/10 rounded-lg transition-colors duration-200">

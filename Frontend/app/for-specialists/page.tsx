@@ -1,18 +1,18 @@
 import Link from "next/link";
 import { Users, Calendar, Shield, TrendingUp, Clock, Globe, CheckCircle, Star, DollarSign } from "lucide-react";
 
-export default function ForSpecialists() {
+export default function ForSpecialistsPage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-[#2596be] to-[#1d7a99] text-white py-20">
+      <section className="bg-[#2596be] text-white py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
               <h1 className="text-4xl md:text-5xl font-bold mb-6">
                 Join Our Network of Mental Health Professionals
               </h1>
-              <p className="text-xl text-blue-100 mb-8">
+              <p className="text-xl text-cyan-50/90 mb-8">
                 Expand your practice, reach more clients, and make a meaningful impact 
                 with our comprehensive platform designed for mental health specialists.
               </p>
@@ -26,7 +26,11 @@ export default function ForSpecialists() {
               </div>
             </div>
             <div className="flex justify-center">
-              <img src="/therapist-platform.png" alt="Therapist Platform" className="w-full max-w-lg rounded-2xl shadow-xl" />
+              <img 
+                src="/landing page/BD8EEEE5-024D-45D6-9920-887C8A846CDD.png" 
+                alt="Mental Health Professional Platform" 
+                className="w-full max-w-lg rounded-2xl shadow-xl border-4 border-white" 
+              />
             </div>
           </div>
         </div>

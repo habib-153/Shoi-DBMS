@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth, RequireAuth } from "@/lib/auth-context";
+import { motion } from "framer-motion";
 import { 
   Heart, 
   Moon, 
@@ -340,7 +341,7 @@ function HealthTrackerPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2596be] mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading health tracker...</p>
@@ -350,46 +351,91 @@ function HealthTrackerPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">Health Tracker</h1>
-          <p className="text-gray-600">Monitor your daily mood, sleep, and symptoms</p>
-        </div>
+    <div className="min-h-screen bg-white">
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="container mx-auto px-4 py-8"
+      >
+        {/* Hero Header */}
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="bg-[#2596be] rounded-3xl shadow-2xl p-8 mb-8 text-white relative overflow-hidden"
+        >
+          {/* Animated background */}
+          <motion.div 
+            animate={{ rotate: 360 }}
+            transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
+            className="absolute -top-20 -right-20 w-64 h-64 bg-white/10 rounded-full blur-3xl"
+          />
+          <motion.div 
+            animate={{ rotate: -360 }}
+            transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+            className="absolute -bottom-20 -left-20 w-64 h-64 bg-white/10 rounded-full blur-3xl"
+          />
+          
+          <div className="relative z-10">
+            <div className="flex items-center gap-4 mb-4">
+              <motion.div
+                animate={{ scale: [1, 1.1, 1] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
+                <Heart className="w-12 h-12" />
+              </motion.div>
+              <div>
+                <h1 className="text-4xl font-bold">Health Tracker</h1>
+                <p className="text-cyan-50/90">Monitor your daily mood, sleep, and symptoms</p>
+              </div>
+            </div>
+          </div>
+        </motion.div>
 
         {/* Tab Navigation */}
-        <div className="flex gap-4 mb-8">
-          <button
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="flex gap-4 mb-8 bg-white rounded-2xl shadow-lg p-2 border-2 border-cyan-100"
+        >
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => setActiveTab("today")}
-            className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+            className={`flex-1 px-6 py-3 rounded-xl font-semibold transition-all ${
               activeTab === "today"
-                ? "bg-[#2596be] text-white"
-                : "bg-white text-gray-700 hover:bg-gray-50"
+                ? "bg-[#2596be] text-white shadow-lg"
+                : "text-gray-700 hover:bg-gray-50"
             }`}
           >
             Today's Log
-          </button>
-          <button
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => setActiveTab("history")}
-            className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+            className={`flex-1 px-6 py-3 rounded-xl font-semibold transition-all ${
               activeTab === "history"
-                ? "bg-[#2596be] text-white"
-                : "bg-white text-gray-700 hover:bg-gray-50"
+                ? "bg-[#2596be] text-white shadow-lg"
+                : "text-gray-700 hover:bg-gray-50"
             }`}
           >
             History
-          </button>
-          <button
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => setActiveTab("symptoms")}
-            className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+            className={`flex-1 px-6 py-3 rounded-xl font-semibold transition-all ${
               activeTab === "symptoms"
-                ? "bg-[#2596be] text-white"
-                : "bg-white text-gray-700 hover:bg-gray-50"
+                ? "bg-[#2596be] text-white shadow-lg"
+                : "text-gray-700 hover:bg-gray-50"
             }`}
           >
             Symptoms
-          </button>
-        </div>
+          </motion.button>
+        </motion.div>
 
         {/* Today's Log Tab */}
         {activeTab === "today" && (
@@ -634,7 +680,7 @@ function HealthTrackerPage() {
             )}
           </div>
         )}
-      </div>
+      </motion.div>
     </div>
   );
 }

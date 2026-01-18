@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useAuth, RequireAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Calendar, Clock, User, CreditCard, Check, X, AlertCircle, MessageCircle, Activity, Bell, Settings, RefreshCw, UserRound, FileText, BookOpen, NotepadText, Users } from "lucide-react";
+import { motion } from "framer-motion";
+import { Calendar, Clock, User, CreditCard, Check, X, AlertCircle, MessageCircle, Activity, Bell, Settings, RefreshCw, UserRound, FileText, BookOpen, NotepadText, Users, TrendingUp, Award, Heart, Zap, Target, BarChart3, PieChart } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -246,54 +247,113 @@ function DashboardContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-modern">
+    <div className="min-h-screen bg-white">
       {/* Header */}
-      <div className="glass border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">
-                Welcome back, {user?.name || 'User'}!
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-[#2596be] border-b border-cyan-700/20 relative overflow-hidden"
+      >
+        {/* Animated background elements */}
+        <div className="absolute inset-0">
+          <motion.div 
+            animate={{ 
+              scale: [1, 1.2, 1],
+              x: [0, 50, 0],
+              y: [0, 30, 0],
+            }}
+            transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+            className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl"
+          />
+          <motion.div 
+            animate={{ 
+              scale: [1.2, 1, 1.2],
+              x: [0, -30, 0],
+              y: [0, -50, 0],
+            }}
+            transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+            className="absolute bottom-0 left-0 w-96 h-96 bg-white/5 rounded-full blur-3xl"
+          />
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="flex justify-between items-center py-8">
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <h1 className="text-3xl font-bold text-white mb-2">
+                Welcome back, {user?.name || 'User'}! 👋
               </h1>
-              <p className="text-muted-foreground">Here's your mental health journey overview</p>
-            </div>
-            <div className="flex items-center gap-4">
-              <button 
+              <p className="text-cyan-50/90 text-lg">Here's your mental health journey overview</p>
+            </motion.div>
+            <motion.div 
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 }}
+              className="flex items-center gap-3"
+            >
+              <motion.button 
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={fetchDashboardData}
                 disabled={loading}
-                className="p-2 hover:bg-white/10 rounded-lg transition-all disabled:opacity-50"
+                className="p-3 hover:bg-white/20 rounded-xl transition-all disabled:opacity-50 backdrop-blur-sm border border-white/20"
                 title="Refresh dashboard"
               >
                 {loading ? (
-                  <div className="animate-spin w-5 h-5 border-2 border-primary border-t-transparent rounded-full"></div>
+                  <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div>
                 ) : (
-                  <RefreshCw className="w-5 h-5 text-muted-foreground hover:text-foreground transition-colors" />
+                  <RefreshCw className="w-5 h-5 text-white" />
                 )}
-              </button>
-              <button className="p-2 hover:bg-white/10 rounded-lg transition-all">
-                <Bell className="w-5 h-5 text-muted-foreground hover:text-foreground transition-colors" />
-              </button>
-              <Link href="/profile" className="p-2 hover:bg-white/10 rounded-lg transition-all">
-                <Settings className="w-5 h-5 text-muted-foreground hover:text-foreground transition-colors" />
+              </motion.button>
+              <motion.button 
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="p-3 hover:bg-white/20 rounded-xl transition-all backdrop-blur-sm border border-white/20 relative"
+              >
+                <Bell className="w-5 h-5 text-white" />
+                {notifications.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-xs text-white flex items-center justify-center font-bold">
+                    {notifications.length}
+                  </span>
+                )}
+              </motion.button>
+              <Link href="/profile">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="p-3 hover:bg-white/20 rounded-xl transition-all backdrop-blur-sm border border-white/20"
+                >
+                  <Settings className="w-5 h-5 text-white" />
+                </motion.button>
               </Link>
-            </div>
+            </motion.div>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {loading && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             {[1, 2, 3].map((i) => (
-              <Card key={i} className="p-6 animate-pulse">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gray-200 rounded-full"></div>
-                  <div>
-                    <div className="h-4 bg-gray-200 rounded w-24 mb-2"></div>
-                    <div className="h-6 bg-gray-200 rounded w-16"></div>
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.1 }}
+              >
+                <Card className="p-6 animate-pulse">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-gray-200 rounded-full"></div>
+                    <div>
+                      <div className="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+                      <div className="h-6 bg-gray-200 rounded w-16"></div>
+                    </div>
                   </div>
-                </div>
-              </Card>
+                </Card>
+              </motion.div>
             ))}
           </div>
         )}
@@ -301,52 +361,111 @@ function DashboardContent() {
         {!loading && (
           <>
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Link href="/appointments" className="bg-[#2596be] text-white p-6 rounded-xl hover:bg-[#1d7a99] transition-colors shadow-lg">
-            <Calendar className="w-8 h-8 mb-3" />
-            <h3 className="font-semibold text-lg">Book Appointment</h3>
-            <p className="text-blue-100 text-sm">Schedule a new session</p>
-          </Link>
-          
-          <Link href="/health-tracker" className="card-modern border-0 p-6 hover:shadow-md transition-shadow group">
-            <Activity className="w-8 h-8 mb-3 text-[#2596be] group-hover:scale-110 transition-transform" />
-            <h3 className="font-semibold text-lg text-foreground">Health Tracker</h3>
-            <p className="text-muted-foreground text-sm">Track daily mood & symptoms</p>
-          </Link>
-          
-          <Link href="/assessments" className="card-modern border-0 p-6 hover:shadow-md transition-shadow group">
-            <MessageCircle className="w-8 h-8 mb-3 text-[#2596be] group-hover:scale-110 transition-transform" />
-            <h3 className="font-semibold text-lg text-foreground">Assessments</h3>
-            <p className="text-muted-foreground text-sm">Take mental health tests</p>
-          </Link>
-          
-          <Link href="/resources" className="card-modern border-0 p-6 hover:shadow-md transition-shadow group">
-            <BookOpen className="w-8 h-8 mb-3 text-[#2596be] group-hover:scale-110 transition-transform" />
-            <h3 className="font-semibold text-lg text-foreground">Resources</h3>
-            <p className="text-muted-foreground text-sm">Books, articles & tools</p>
-          </Link>
-        </div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <Zap className="w-6 h-6 text-[#2596be]" />
+            Quick Actions
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <Link href="/appointments">
+              <motion.div 
+                whileHover={{ scale: 1.03, y: -4 }}
+                whileTap={{ scale: 0.98 }}
+                className="bg-[#2596be] text-white p-6 rounded-2xl shadow-lg hover:shadow-2xl transition-all cursor-pointer group"
+              >
+                <Calendar className="w-10 h-10 mb-3 group-hover:scale-110 transition-transform" />
+                <h3 className="font-bold text-lg mb-1">Book Appointment</h3>
+                <p className="text-cyan-50/80 text-sm">Schedule a new session</p>
+              </motion.div>
+            </Link>
+            
+            <Link href="/health-tracker">
+              <motion.div
+                whileHover={{ scale: 1.03, y: -4 }}
+                whileTap={{ scale: 0.98 }}
+                className="bg-white border-2 border-cyan-100 p-6 rounded-2xl shadow-lg hover:shadow-2xl hover:border-[#2596be] transition-all cursor-pointer group"
+              >
+                <Activity className="w-10 h-10 mb-3 text-[#2596be] group-hover:scale-110 transition-transform" />
+                <h3 className="font-bold text-lg mb-1 text-gray-900">Health Tracker</h3>
+                <p className="text-gray-600 text-sm">Track daily mood & symptoms</p>
+              </motion.div>
+            </Link>
+            
+            <Link href="/assessments">
+              <motion.div
+                whileHover={{ scale: 1.03, y: -4 }}
+                whileTap={{ scale: 0.98 }}
+                className="bg-white border-2 border-cyan-100 p-6 rounded-2xl shadow-lg hover:shadow-2xl hover:border-[#2596be] transition-all cursor-pointer group"
+              >
+                <FileText className="w-10 h-10 mb-3 text-[#2596be] group-hover:scale-110 transition-transform" />
+                <h3 className="font-bold text-lg mb-1 text-gray-900">Assessments</h3>
+                <p className="text-gray-600 text-sm">Take mental health tests</p>
+              </motion.div>
+            </Link>
+            
+            <Link href="/resources">
+              <motion.div
+                whileHover={{ scale: 1.03, y: -4 }}
+                whileTap={{ scale: 0.98 }}
+                className="bg-white border-2 border-cyan-100 p-6 rounded-2xl shadow-lg hover:shadow-2xl hover:border-[#2596be] transition-all cursor-pointer group"
+              >
+                <BookOpen className="w-10 h-10 mb-3 text-[#2596be] group-hover:scale-110 transition-transform" />
+                <h3 className="font-bold text-lg mb-1 text-gray-900">Resources</h3>
+                <p className="text-gray-600 text-sm">Books, articles & tools</p>
+              </motion.div>
+            </Link>
+          </div>
+        </motion.div>
 
         {/* Additional Features Row */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Link href="/appointments/history" className="card-modern border-0 p-6 hover:shadow-md transition-shadow group">
-            <Clock className="w-8 h-8 mb-3 text-[#2596be] group-hover:scale-110 transition-transform" />
-            <h3 className="font-semibold text-lg text-foreground">Appointment History</h3>
-            <p className="text-muted-foreground text-sm">View past sessions</p>
-          </Link>
-          
-          <Link href="/messages" className="card-modern border-0 p-6 hover:shadow-md transition-shadow group">
-            <MessageCircle className="w-8 h-8 mb-3 text-[#2596be] group-hover:scale-110 transition-transform" />
-            <h3 className="font-semibold text-lg text-foreground">Messages</h3>
-            <p className="text-muted-foreground text-sm">Chat with therapists</p>
-          </Link>
-          
-          <Link href="/family" className="card-modern border-0 p-6 hover:shadow-md transition-shadow group">
-            <Users className="w-8 h-8 mb-3 text-[#2596be] group-hover:scale-110 transition-transform" />
-            <h3 className="font-semibold text-lg text-foreground">Family & Privacy</h3>
-            <p className="text-muted-foreground text-sm">Manage sharing settings</p>
-          </Link>
-        </div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <BarChart3 className="w-6 h-6 text-[#2596be]" />
+            More Features
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <Link href="/appointments/history">
+              <motion.div
+                whileHover={{ scale: 1.02, y: -2 }}
+                className="bg-white border-2 border-cyan-100 p-6 rounded-2xl shadow-lg hover:shadow-xl hover:border-[#2596be] transition-all cursor-pointer group"
+              >
+                <Clock className="w-8 h-8 mb-3 text-[#2596be] group-hover:scale-110 transition-transform" />
+                <h3 className="font-bold text-lg mb-1 text-gray-900">Appointment History</h3>
+                <p className="text-gray-600 text-sm">View past sessions</p>
+              </motion.div>
+            </Link>
+            
+            <Link href="/messages">
+              <motion.div
+                whileHover={{ scale: 1.02, y: -2 }}
+                className="bg-white border-2 border-cyan-100 p-6 rounded-2xl shadow-lg hover:shadow-xl hover:border-[#2596be] transition-all cursor-pointer group"
+              >
+                <MessageCircle className="w-8 h-8 mb-3 text-[#2596be] group-hover:scale-110 transition-transform" />
+                <h3 className="font-bold text-lg mb-1 text-gray-900">Messages</h3>
+                <p className="text-gray-600 text-sm">Chat with therapists</p>
+              </motion.div>
+            </Link>
+            
+            <Link href="/family">
+              <motion.div
+                whileHover={{ scale: 1.02, y: -2 }}
+                className="bg-white border-2 border-cyan-100 p-6 rounded-2xl shadow-lg hover:shadow-xl hover:border-[#2596be] transition-all cursor-pointer group"
+              >
+                <Users className="w-8 h-8 mb-3 text-[#2596be] group-hover:scale-110 transition-transform" />
+                <h3 className="font-bold text-lg mb-1 text-gray-900">Family & Privacy</h3>
+                <p className="text-gray-600 text-sm">Manage sharing settings</p>
+              </motion.div>
+            </Link>
+          </div>
+        </motion.div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -397,7 +516,7 @@ function DashboardContent() {
             <div className="card-modern border-0 p-6">
               <h3 className="text-lg font-semibold text-foreground mb-4">Health Overview</h3>
               <div className="space-y-4">
-                {analytics.mood_trend?.recent_avg > 0 && (
+                {analytics?.mood_trend?.recent_avg && analytics.mood_trend.recent_avg > 0 && (
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Recent Mood Trend</span>
                     <div className="flex items-center gap-2">
@@ -419,7 +538,7 @@ function DashboardContent() {
                     </div>
                   </div>
                 )}
-                {analytics.assessments?.total_assessments > 0 && (
+                {analytics?.assessments?.total_assessments && analytics.assessments.total_assessments > 0 && (
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Total Assessments</span>
                     <span className="text-lg font-semibold text-foreground">{analytics.assessments.total_assessments}</span>

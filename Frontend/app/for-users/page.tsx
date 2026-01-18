@@ -1,18 +1,18 @@
 import Link from "next/link";
 import { Heart, Clock, Shield, MessageCircle, Users, CheckCircle, Star, ArrowRight } from "lucide-react";
 
-export default function ForUsers() {
+export default function ForUsersPage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-[#2596be] to-[#1d7a99] text-white py-20">
+      <section className="bg-[#2596be] text-white py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
               <h1 className="text-4xl md:text-5xl font-bold mb-6">
                 Your Mental Health Matters
               </h1>
-              <p className="text-xl text-blue-100 mb-8">
+              <p className="text-xl text-cyan-50/90 mb-8">
                 Connect with licensed therapists who understand your journey. 
                 Get the support you deserve in a safe, confidential environment.
               </p>
@@ -26,7 +26,11 @@ export default function ForUsers() {
               </div>
             </div>
             <div className="flex justify-center">
-              <img src="/mental-health-support.png" alt="Mental Health Support" className="w-full max-w-lg rounded-2xl shadow-xl" />
+              <img 
+                src="/landing page/52CD0FD9-2638-4461-B3C3-F112EB401DD0.png" 
+                alt="Mental Health Support and Wellness" 
+                className="w-full max-w-lg rounded-2xl shadow-xl border-4 border-white" 
+              />
             </div>
           </div>
         </div>

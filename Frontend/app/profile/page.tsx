@@ -58,7 +58,8 @@ export default function Profile() {
         return;
       }
 
-      const response = await fetch(`/api/users/${userId}`);
+      // Add viewer_id parameter so the user can view their own profile
+      const response = await fetch(`/api/users/${userId}?viewer_id=${userId}`);
       console.log('API response status:', response.status);
       
       if (response.ok) {

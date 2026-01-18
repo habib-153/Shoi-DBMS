@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { useLanguage } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { AnimatedCard, FadeIn, SlideIn } from "@/components/animated/AnimatedComponents";
+import { motion } from "framer-motion";
 
 import Link from "next/link";
 import {
@@ -18,6 +20,7 @@ import {
   Facebook,
   Instagram,
   LogIn,
+  Sparkles,
 } from "lucide-react";
 
 export default function LoginPage() {
@@ -47,10 +50,9 @@ export default function LoginPage() {
         return;
       }
 
-      // Use auth context to handle login
       login({ ...data.user, role: data.role });
-
       toast.success(t("login.success"));
+      
       if (data.role === "therapist") {
         router.push("/therapist/dashboard");
       } else {
@@ -65,148 +67,200 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative min-h-screen bg-gradient-modern flex items-center justify-center px-4">
+    <div className="relative min-h-screen bg-white flex items-center justify-center px-4 overflow-hidden">
       <LanguageSwitcher />
-      <Card className="w-full max-w-md p-8 card-modern border-0">
-        {/* Logo */}
-        <div className="flex justify-center mb-6">
-          <img src="/4F43E8E1-1786-4A37-93AF-2E381EE3B968.png" alt="সই Logo" className="h-20 w-auto" />
-        </div>
+      
+      <AnimatedCard className="w-full max-w-md relative z-10">
+        <Card className="p-8 bg-white/80 backdrop-blur-sm border-2 border-[#2596be]/20 shadow-2xl rounded-3xl">
+          {/* Logo */}
+          <SlideIn direction="down" delay={0.1}>
+            <div className="flex justify-center mb-6">
+              <motion.img 
+                src="/4F43E8E1-1786-4A37-93AF-2E381EE3B968.png" 
+                alt="সই Logo" 
+                className="h-20 w-auto"
+                whileHover={{ scale: 1.05, rotate: 5 }}
+                transition={{ duration: 0.3 }}
+              />
+            </div>
+          </SlideIn>
         
-        <h1 className="text-3xl font-bold text-center mb-1 text-primary">সই</h1>
-        <p className="text-center text-muted-foreground mb-6">
-          Login To Your Account
-          {role === "therapist" && (
-            <span className="block text-[#2596be] text-sm font-medium">Therapist Portal</span>
-          )}
-          {role === "user" && (
-            <span className="block text-[#2596be] text-sm font-medium">Patient Portal</span>
-          )}
-        </p>
+          <FadeIn delay={0.2}>
+            <h1 className="text-3xl font-bold text-center mb-1 text-[#2596be]">সই</h1>
+            <p className="text-center text-muted-foreground mb-6">
+              Login To Your Account
+              {role === "therapist" && (
+                <span className="block text-[#2596be] text-sm font-medium mt-1">
+                  <Sparkles className="w-4 h-4 inline mr-1" />
+                  Therapist Portal
+                </span>
+              )}
+            </p>
+          </FadeIn>
 
-        <form onSubmit={handleLogin} className="space-y-4">
-          {/* Role Selection */}
-          <div>
-            <label className="block text-sm mb-2">Login as</label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setRole("user")}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  role === "user"
-                    ? "bg-[#2596be] text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                Patient
-              </button>
-              <button
-                type="button"
-                onClick={() => setRole("therapist")}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  role === "therapist"
-                    ? "bg-[#2596be] text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                Therapist
-              </button>
-            </div>
-          </div>
+          <form onSubmit={handleLogin} className="space-y-4">
+            {/* Role Selection */}
+            <FadeIn delay={0.3}>
+              <div>
+                <label className="block text-sm mb-2 font-medium text-gray-700">Login as</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    type="button"
+                    onClick={() => setRole("user")}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                      role === "user"
+                        ? "bg-[#2596be] text-white shadow-md"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    Patient
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    type="button"
+                    onClick={() => setRole("therapist")}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                      role === "therapist"
+                        ? "bg-[#2596be] text-white shadow-md"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    Therapist
+                  </motion.button>
+                </div>
+              </div>
+            </FadeIn>
 
-          <div>
-            <label className="block text-sm mb-1">E-mail</label>
-            <div className="relative flex items-center">
-              <Mail className="w-4 h-4 absolute left-3 text-gray-400 z-10" />
-              <input
-                type="email"
-                className="w-full pl-9 pr-3 py-2.5 input-modern"
-                placeholder="name@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-          </div>
+            {/* Email Input */}
+            <SlideIn direction="left" delay={0.4}>
+              <div className="relative">
+                <label htmlFor="email" className="block text-sm mb-2 font-medium text-gray-700">
+                  Email
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="input-modern pl-10"
+                    placeholder="your@email.com"
+                    required
+                  />
+                </div>
+              </div>
+            </SlideIn>
 
-          <div>
-            <label className="block text-sm mb-1">Password</label>
-            <div className="relative flex items-center">
-              <Lock className="w-4 h-4 absolute left-3 text-gray-400 z-10" />
-              <input
-                type={showPw ? "text" : "password"}
-                className="w-full pl-9 pr-10 py-2.5 input-modern"
-                placeholder="Your Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPw((s) => !s)}
-                className="absolute right-3 text-gray-500 hover:text-gray-700 z-10"
-                aria-label="Toggle password"
+            {/* Password Input */}
+            <SlideIn direction="right" delay={0.5}>
+              <div className="relative">
+                <label htmlFor="password" className="block text-sm mb-2 font-medium text-gray-700">
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    id="password"
+                    type={showPw ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="input-modern pl-10 pr-10"
+                    placeholder="••••••••"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPw(!showPw)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#2596be] transition-colors"
+                  >
+                    {showPw ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+              </div>
+            </SlideIn>
+
+            {/* Submit Button */}
+            <FadeIn delay={0.6}>
+              <motion.div
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
               >
-                {showPw ? (
-                  <EyeOff className="w-5 h-5" />
-                ) : (
-                  <Eye className="w-5 h-5" />
-                )}
-              </button>
+                <Button
+                  type="submit"
+                  className="w-full btn-primary py-6 text-base"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
+                    />
+                  ) : (
+                    <>
+                      <LogIn className="w-5 h-5" />
+                      Login
+                    </>
+                  )}
+                </Button>
+              </motion.div>
+            </FadeIn>
+          </form>
+
+          {/* Divider */}
+          <FadeIn delay={0.7}>
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500">Or continue with</span>
+              </div>
             </div>
-            <div className="text-right mt-1">
+          </FadeIn>
+
+          {/* Social Login */}
+          <FadeIn delay={0.8}>
+            <div className="grid grid-cols-2 gap-3">
+              <motion.button
+                whileHover={{ scale: 1.03, y: -2 }}
+                whileTap={{ scale: 0.98 }}
+                type="button"
+                className="flex items-center justify-center gap-2 px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <Facebook className="w-5 h-5 text-blue-600" />
+                <span className="text-sm font-medium">Facebook</span>
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.03, y: -2 }}
+                whileTap={{ scale: 0.98 }}
+                type="button"
+                className="flex items-center justify-center gap-2 px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <Instagram className="w-5 h-5 text-pink-600" />
+                <span className="text-sm font-medium">Instagram</span>
+              </motion.button>
+            </div>
+          </FadeIn>
+
+          {/* Register Link */}
+          <FadeIn delay={0.9}>
+            <p className="text-center text-sm text-gray-600 mt-6">
+              Don't have an account?{" "}
               <Link
-                href="/forgot-password"
-                className="text-sm text-[#2596be] hover:underline"
+                href="/register"
+                className="text-[#2596be] font-medium hover:underline"
               >
-                Forgot password?
+                Sign up
               </Link>
-            </div>
-          </div>
-
-          <Button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-[#2596be] hover:bg-[#1d7a99] text-white py-2.5 flex items-center justify-center gap-2 rounded-lg font-medium transition-all duration-300 shadow-md hover:shadow-lg"
-          >
-            <LogIn className="w-4 h-4" />
-            {loading ? "Logging in..." : "Login"}
-          </Button>
-        </form>
-
-        {/* OR divider */}
-        <div className="flex items-center gap-3 my-6">
-          <div className="h-px bg-gray-200 flex-1" />
-          <span className="text-xs text-gray-400">Or</span>
-          <div className="h-px bg-gray-200 flex-1" />
-        </div>
-
-        {/* Social logins (visual) */}
-        <div className="grid grid-cols-2 gap-3">
-          <Button
-            variant="outline"
-            className="w-full border-[#2596be] text-[#2596be] hover:bg-[#2596be] hover:text-white transition-all duration-300"
-          >
-            <Facebook className="w-4 h-4 mr-2" /> Facebook
-          </Button>
-          <Button
-            variant="outline"
-            className="w-full border-[#2596be] text-[#2596be] hover:bg-[#2596be] hover:text-white transition-all duration-300"
-          >
-            <Instagram className="w-4 h-4 mr-2" /> Instagram
-          </Button>
-        </div>
-
-        <p className="text-center text-sm text-gray-600 mt-6">
-          New User?{" "}
-          <Link
-            href="/register"
-            className="text-[#2596be] font-semibold hover:underline"
-          >
-            Register
-          </Link>
-        </p>
-      </Card>
+            </p>
+          </FadeIn>
+        </Card>
+      </AnimatedCard>
     </div>
   );
 }

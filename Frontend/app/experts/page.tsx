@@ -277,15 +277,15 @@ export default function Experts() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-modern">
+    <div className="min-h-screen bg-gradient-to-br from-white via-cyan-50/20 to-white">
       {/* Header */}
-      <div className="glass">
+      <div className="bg-gradient-to-br from-[#2596be] to-cyan-600 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="text-center">
-            <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-4">
+            <h1 className="text-4xl md:text-5xl font-bold mb-4">
               Meet Our Mental Health Experts
             </h1>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+            <p className="text-xl text-cyan-50 max-w-3xl mx-auto">
               Connect with experienced professionals who are dedicated to supporting your mental health journey. 
               Our experts are here to provide personalized care and evidence-based treatments.
             </p>
@@ -337,7 +337,7 @@ export default function Experts() {
           {filteredTherapists.map((therapist) => (
             <div key={therapist.therapist_id} className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden">
               {/* Therapist Image */}
-              <div className="h-48 bg-gradient-to-br from-[#2596be] to-[#1d7a99] flex items-center justify-center">
+              <div className="h-48 bg-[#2596be] flex items-center justify-center">
                 <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center text-[#2596be] text-2xl font-bold">
                   {therapist.name.split(' ').map(n => n[0]).join('')}
                 </div>

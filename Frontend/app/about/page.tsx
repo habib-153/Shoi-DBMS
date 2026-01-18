@@ -1,15 +1,15 @@
 import { Heart, Users, Shield, Award, Clock, Globe } from "lucide-react";
 import Link from "next/link";
 
-export default function About() {
+export default function AboutPage() {
   return (
-    <div className="min-h-screen bg-gradient-modern">
+    <div className="min-h-screen bg-white">
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-primary to-primary-dark text-white py-20">
+      <section className="bg-[#2596be] text-white py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h1 className="text-4xl md:text-6xl font-bold mb-6">About সই</h1>
-            <p className="text-xl md:text-2xl text-blue-100 max-w-3xl mx-auto">
+            <p className="text-xl md:text-2xl text-cyan-50/90 max-w-3xl mx-auto">
               Your trusted companion in mental health and well-being. We're here to support you every step of the way.
             </p>
           </div>
@@ -38,7 +38,11 @@ export default function About() {
               </div>
             </div>
             <div className="flex justify-center">
-              <img src="/mission.png" alt="Our Mission" className="w-full max-w-md rounded-2xl shadow-lg" />
+              <img 
+                src="/landing page/C9961603-DC53-4693-A797-CC56D6CA79AD.png" 
+                alt="Mental Health and Wellness Journey" 
+                className="w-full max-w-md rounded-2xl shadow-lg border-4 border-white" 
+              />
             </div>
           </div>
         </div>

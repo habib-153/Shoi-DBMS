@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, ChangeEvent } from "react";
+import { useState, ChangeEvent, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
+import { motion } from "framer-motion";
 import {
   User,
   Stethoscope,
@@ -19,6 +20,8 @@ import {
   PencilLine,
   ClipboardList,
   Calendar,
+  Sparkles,
+  Heart,
 } from "lucide-react";
 
 type Role = "user" | "specialist";
@@ -60,6 +63,11 @@ export default function RegisterPage() {
   const [qCertLink, setQCertLink] = useState(""); // Google Drive link
 
   const [loading, setLoading] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    setIsVisible(true);
+  }, []);
 
 
   const submit = async (e: React.FormEvent) => {
@@ -157,43 +165,76 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="relative min-h-screen bg-gradient-modern flex items-center justify-center px-4">
-      <Card className="relative w-full max-w-5xl p-6 sm:p-8 card-modern border-0">
-        {/* Logo */}
-        <div className="flex justify-center mb-4">
-          <img src="/4F43E8E1-1786-4A37-93AF-2E381EE3B968.png" alt="সই Logo" className="h-20 w-auto" />
-        </div>
-        
-        {/* header */}
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl sm:text-3xl font-bold text-primary">
-            সই — Registration
-          </h2>
-          <a href="/login" className="text-sm text-[#2596be] hover:underline">
-            Already Have an Account? Login
-          </a>
-        </div>
+    <div className="relative min-h-screen flex items-center justify-center px-4 overflow-hidden">
+      {/* Clean Background */}
+      <div className="absolute inset-0 bg-white" />
 
-        {/* role tabs */}
-        <div className="grid grid-cols-2 gap-3 mb-6">
-          <Tab
-            active={role === "user"}
-            onClick={() => setRole("user")}
-            icon={<User className="w-4 h-4" />}
-            label="User / Patient"
-          />
-          <Tab
-            active={role === "specialist"}
-            onClick={() => setRole("specialist")}
-            icon={<Stethoscope className="w-4 h-4" />}
-            label="Specialist"
-          />
-        </div>
+      <motion.div
+        initial={{ opacity: 0, y: 20, scale: 0.95 }}
+        animate={{ opacity: isVisible ? 1 : 0, y: isVisible ? 0 : 20, scale: isVisible ? 1 : 0.95 }}
+        transition={{ duration: 0.6 }}
+        className="relative w-full max-w-5xl"
+      >
+        <Card className="relative p-6 sm:p-8 bg-white/80 backdrop-blur-sm border-2 border-[#2596be]/20 shadow-2xl shadow-[#2596be]/10 rounded-3xl overflow-hidden">
+          {/* Card Glow Effect */}
+          <div className="absolute inset-0 bg-[#2596be]/5 pointer-events-none" />
+          
+          {/* Logo */}
+          <motion.div
+            initial={{ scale: 0, rotate: -180 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ duration: 0.8, type: "spring" }}
+            className="flex justify-center mb-4"
+          >
+            <img src="/4F43E8E1-1786-4A37-93AF-2E381EE3B968.png" alt="সই Logo" className="h-20 w-auto" />
+          </motion.div>
+        
+          {/* header */}
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="flex items-center justify-between mb-6"
+          >
+            <h2 className="text-2xl sm:text-3xl font-bold text-[#2596be] flex items-center gap-2">
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+              >
+                <Sparkles className="w-6 h-6 text-[#2596be]" />
+              </motion.div>
+              সই — Registration
+            </h2>
+            <a href="/login" className="text-sm text-[#2596be] hover:underline font-medium">
+              Already Have an Account? Login
+            </a>
+          </motion.div>
+
+          {/* role tabs */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="grid grid-cols-2 gap-3 mb-6"
+          >
+            <Tab
+              active={role === "user"}
+              onClick={() => setRole("user")}
+              icon={<User className="w-4 h-4" />}
+              label="User / Patient"
+            />
+            <Tab
+              active={role === "specialist"}
+              onClick={() => setRole("specialist")}
+              icon={<Stethoscope className="w-4 h-4" />}
+              label="Specialist"
+            />
+          </motion.div>
 
         <form onSubmit={submit} className="grid md:grid-cols-2 gap-8">
           {/* LEFT — Illustration */}
           <div className="hidden md:flex items-center justify-center">
-            <div className="w-full h-full rounded-2xl bg-gradient-to-br from-[#2596be]/10 to-sky-100 grid place-items-center p-6">
+            <div className="w-full h-full rounded-2xl bg-cyan-50 grid place-items-center p-6">
               <img
                 src="/login.ico"
                 className="w-80 h-80 object-contain drop-shadow"
@@ -481,6 +522,7 @@ export default function RegisterPage() {
           </div>
         </form>
       </Card>
+      </motion.div>
     </div>
   );
 }
@@ -498,18 +540,30 @@ function Tab({
   label: string;
 }) {
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onClick}
-      className={`rounded-xl border px-4 py-3 flex items-center justify-center gap-2 transition
+      whileHover={{ scale: 1.02, y: -2 }}
+      whileTap={{ scale: 0.98 }}
+      className={`rounded-xl border px-4 py-3 flex items-center justify-center gap-2 transition-all duration-300 relative overflow-hidden
       ${
         active
-          ? "bg-[#2596be] text-white border-[#2596be]"
-          : "border-gray-300 text-gray-700 hover:bg-gray-50"
+          ? "bg-[#2596be] text-white border-[#2596be] shadow-lg shadow-[#2596be]/30"
+          : "border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-[#2596be]/50"
       }`}
     >
-      {icon} {label}
-    </button>
+      {active && (
+        <motion.div
+          className="absolute inset-0 bg-[#2596be]"
+          initial={{ x: "100%" }}
+          animate={{ x: 0 }}
+          transition={{ duration: 0.3 }}
+        />
+      )}
+      <span className="relative z-10 flex items-center gap-2">
+        {icon} {label}
+      </span>
+    </motion.button>
   );
 }
 
@@ -525,18 +579,35 @@ function SmallTab({
   label: string;
 }) {
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onClick}
-      className={`rounded-lg border px-3 py-2 text-sm flex items-center justify-center gap-2 transition
+      whileHover={{ scale: 1.03 }}
+      whileTap={{ scale: 0.97 }}
+      className={`rounded-lg border px-3 py-2 text-sm flex items-center justify-center gap-2 transition-all duration-300 relative overflow-hidden
       ${
         active
-          ? "bg-[#2596be] text-white border-[#2596be]"
-          : "border-gray-300 text-gray-700 hover:bg-gray-50"
+          ? "bg-[#2596be] text-white border-[#2596be] shadow-md shadow-[#2596be]/30"
+          : "border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-[#2596be]/50"
       }`}
     >
-      {icon} {label}
-    </button>
+      {active && (
+        <motion.div
+          className="absolute inset-0 bg-white/10"
+          animate={{
+            scale: [1, 1.2, 1],
+            opacity: [0.5, 0, 0.5],
+          }}
+          transition={{
+            duration: 2,
+            repeat: Infinity,
+          }}
+        />
+      )}
+      <span className="relative z-10 flex items-center gap-2">
+        {icon} {label}
+      </span>
+    </motion.button>
   );
 }
 
@@ -550,12 +621,18 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-gray-200 p-4">
-      <h3 className="font-semibold flex items-center gap-2 mb-2">
-        {icon} {title}
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="rounded-2xl border-2 border-[#2596be]/20 p-4 bg-white shadow-sm hover:shadow-md transition-all duration-300"
+    >
+      <h3 className="font-semibold flex items-center gap-2 mb-2 text-[#2596be]">
+        {icon}
+        {title}
       </h3>
       {children}
-    </div>
+    </motion.div>
   );
 }
 

@@ -141,7 +141,7 @@ export default function Blogs() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2596be] mx-auto mb-4"></div>
           <p className="text-gray-600">Loading blog posts...</p>
@@ -151,9 +151,9 @@ export default function Blogs() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-white via-cyan-50/20 to-white">
       {/* Header */}
-      <section className="bg-[#2596be] text-white py-16">
+      <section className="bg-gradient-to-br from-[#2596be] to-cyan-600 text-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h1 className="text-4xl md:text-5xl font-bold mb-4">Mental Health Blog</h1>

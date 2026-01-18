@@ -104,7 +104,7 @@ export function RatingDisplay({
       />
       {showValue && (
         <span className="text-sm font-medium text-gray-700">
-          {rating > 0 ? rating.toFixed(1) : 'N/A'}
+          {rating && rating > 0 ? Number(rating).toFixed(1) : 'N/A'}
         </span>
       )}
     </div>

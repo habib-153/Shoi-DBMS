@@ -289,32 +289,32 @@ function AppointmentPageContent() {
   return (
     <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       {/* Hero */}
-      <div className="relative mb-10 overflow-hidden rounded-3xl border border-white/20 bg-gradient-modern">
+      <div className="relative mb-10 overflow-hidden rounded-3xl border-2 border-[#2596be]/20 bg-gradient-to-br from-cyan-50 via-white to-[#2596be]/5">
         <div className="relative z-10 grid items-center gap-6 p-8 lg:p-10 md:grid-cols-2">
           <div>
-            <h1 className="text-3xl md:text-4xl font-bold text-[#1f6d89]">{headerTitle}</h1>
-            <p className="mt-2 text-gray-700">Pick your specialist, choose a time, and confirm. It's that simple.</p>
+            <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-[#2596be] to-cyan-600 bg-clip-text text-transparent">{headerTitle}</h1>
+            <p className="mt-2 text-gray-700 text-lg">Pick your specialist, choose a time, and confirm. It's that simple.</p>
             <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
-              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/90 backdrop-blur border">
-                <Calendar className="w-4 h-4" /> Flexible online sessions
+              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white shadow-md border-2 border-[#2596be]/20 hover:border-[#2596be]/40 transition-all">
+                <Calendar className="w-4 h-4 text-[#2596be]" /> Flexible online sessions
               </span>
-              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/90 backdrop-blur border">
-                <Phone className="w-4 h-4" /> Helpline: 01xxxxxxxxx
+              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white shadow-md border-2 border-[#2596be]/20 hover:border-[#2596be]/40 transition-all">
+                <Phone className="w-4 h-4 text-[#2596be]" /> Helpline: 01xxxxxxxxx
               </span>
             </div>
           </div>
           <div className="relative mx-auto md:mx-0 w-full max-w-[520px]">
-            <div className="absolute -right-10 -top-10 h-56 w-56 rounded-full bg-[#2596be]/25 blur-3xl" />
-            <div className="absolute -left-10 bottom-0 h-40 w-40 rounded-full bg-[#1f6d89]/15 blur-3xl" />
-            <div className="absolute inset-0 rounded-[28px] bg-gradient-to-br from-[#2596be]/30 via-transparent to-transparent blur-[20px]" />
-            <div className="relative z-10 rounded-[28px] border border-white/70 bg-white/80 backdrop-blur shadow-2xl">
-              <div className="p-2 sm:p-3">
-                <img src="/Appointment.jpg" alt="Easy appointment booking" className="block w-full rounded-[22px] object-cover" />
+            <div className="relative z-10 rounded-3xl border-4 border-white bg-white shadow-2xl overflow-hidden">
+              <div className="p-3">
+                <img 
+                  src="/landing page/8FC770F2-49BA-4D21-917B-D884E143D4E9.png" 
+                  alt="Easy appointment booking with mental health professionals" 
+                  className="block w-full rounded-2xl object-cover" 
+                />
               </div>
             </div>
           </div>
         </div>
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/5 to-transparent" />
       </div>
 
       {/* Tabs */}
@@ -578,7 +578,7 @@ export default function AppointmentPage() {
   return (
     <RequireAuth
       fallback={
-        <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-[#2596be]/10 via-sky-50 to-indigo-50">
+        <div className="flex items-center justify-center min-h-screen bg-white">
           <div className="text-center p-8 bg-white rounded-xl shadow-lg max-w-md mx-4">
             <h1 className="text-2xl font-bold text-gray-900 mb-4">Login Required</h1>
             <p className="text-gray-600 mb-6">You need to be logged in to book appointments.</p>
