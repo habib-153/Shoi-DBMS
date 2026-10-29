@@ -171,21 +171,7 @@ if (therapist_id && session.therapist_id !== parseInt(therapist_id)) {
 1. `/app/api/therapist/[therapistId]/appointments-with-notes/route.ts` - New endpoint
 2. `/app/api/get-table-info/route.ts` - Debug endpoint (can delete)
 
-## 🚀 Usage
 
-### For Therapists:
-1. Navigate to "Session Notes" from dashboard
-2. See list of completed appointments ordered by date/time
-3. Click "Add Note" on appointments without notes
-4. Click "Edit Note" on appointments with existing notes
-5. Fill form and save
-6. Back button to navigate back to dashboard
-
-### For Development:
-- All session-related data properly linked via foreign keys
-- Can query appointment history by `created_at`
-- Can track session progression by timestamps
-- Full audit trail: booking time → appointment time → session creation → note creation
 
 ## ✅ System Status
 
